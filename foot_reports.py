@@ -16,6 +16,7 @@ load_dotenv()
 app = FastAPI(title="FeetFit Raspberry Pi Foot Reports API")
 
 AI_BASE_URL = os.getenv("AI_BASE_URL", "").rstrip("/")
+BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "").rstrip("/")
 
 CAMERA_DEVICE = os.getenv("CAMERA_DEVICE", "/dev/video0")
 IMAGE_WIDTH = os.getenv("IMAGE_WIDTH", "1280")
@@ -43,8 +44,47 @@ def get_ai_url(ai_path: str) -> str:
     return f"{AI_BASE_URL}{ai_path}"
 
 
+def get_backend_url(path: str) -> str:
+    if not BACKEND_BASE_URL:
+        raise ValueError("BACKEND_BASE_URL is empty. Please check your .env file.")
+
+    if not path.startswith("/"):
+        raise ValueError("Backend path must start with '/'.")
+
+    return f"{BACKEND_BASE_URL}{path}"
+
+
 def get_image_path(measurement_session_id: int, foot: str) -> Path:
     return IMAGE_DIR / f"{measurement_session_id}_{foot}.jpg"
+
+
+def update_measurement_status(
+    measurement_session_id: int,
+    status: str,
+    authorization: str,
+) -> None:
+    url = get_backend_url(f"/api/measurement-sessions/{measurement_session_id}/status")
+
+    headers = {
+        "accept": "application/json",
+        "Authorization": authorization,
+        "ngrok-skip-browser-warning": "true",
+    }
+
+    response = requests.patch(
+        url,
+        headers=headers,
+        params={
+            "status": status,
+        },
+        timeout=30,
+    )
+
+    print(f"[status] request url: {response.url}")
+    print(f"[status] response status: {response.status_code}")
+    print(f"[status] response body: {response.text}")
+
+    response.raise_for_status()
 
 
 def capture_image(image_path: Path) -> None:
@@ -72,6 +112,8 @@ def capture_image(image_path: Path) -> None:
     if not image_path.exists():
         raise FileNotFoundError(f"Image file was not created: {image_path}")
 
+
+
 def capture_left_then_right(measurement_session_id: int) -> tuple[Path, Path]:
     left_path = get_image_path(measurement_session_id, "left")
     right_path = get_image_path(measurement_session_id, "right")
@@ -96,7 +138,7 @@ def send_images_to_ai(
     measurement_session_id: int,
     left_path: Path,
     right_path: Path,
-    authorization: str | None = None,
+    authorization: str,
 ) -> dict[str, Any]:
     if not left_path.exists():
         raise FileNotFoundError("Left foot image does not exist.")
@@ -104,13 +146,15 @@ def send_images_to_ai(
     if not right_path.exists():
         raise FileNotFoundError("Right foot image does not exist.")
 
+    print(f"[{report_type}] AI URL: {get_ai_url(ai_path)}")
+    print(f"[{report_type}] left image: {left_path}, size={left_path.stat().st_size} bytes")
+    print(f"[{report_type}] right image: {right_path}, size={right_path.stat().st_size} bytes")
+
     headers = {
         "accept": "application/json",
+        "Authorization": authorization,
         "ngrok-skip-browser-warning": "true",
     }
-
-    if authorization is not None:
-        headers["Authorization"] = authorization
 
     data = {
         "measurementSessionId": str(measurement_session_id),
@@ -130,6 +174,9 @@ def send_images_to_ai(
             timeout=180,
         )
 
+    print(f"[{report_type}] AI response status: {response.status_code}")
+    print(f"[{report_type}] AI response body: {response.text}")
+
     response.raise_for_status()
 
     return {
@@ -137,6 +184,7 @@ def send_images_to_ai(
         "success": True,
         "statusCode": response.status_code,
     }
+
 
 def send_to_all_ai_servers(
     measurement_session_id: int,
@@ -218,6 +266,12 @@ def create_all_reports(
             measurement_session_id=request.measurementSessionId,
         )
 
+        update_measurement_status(
+            measurement_session_id=request.measurementSessionId,
+            status="TRANSFERRING",
+            authorization=authorization,
+        )
+
         results = send_to_all_ai_servers(
             measurement_session_id=request.measurementSessionId,
             left_path=left_path,
@@ -228,12 +282,23 @@ def create_all_reports(
         return {
             "success": True,
             "measurementSessionId": request.measurementSessionId,
-            "message": "Images were captured once and sent to both tina-pedis and hallux-valgus AI servers successfully.",
+            "message": "Measurement status was changed to TRANSFERRING, and images were sent to both AI servers successfully.",
             "results": results,
         }
 
     except Exception as error:
+        try:
+            if authorization is not None:
+                update_measurement_status(
+                    measurement_session_id=request.measurementSessionId,
+                    status="FAILED",
+                    authorization=authorization,
+                )
+        except Exception as status_error:
+            print(f"[status] failed to update status to FAILED: {status_error}")
+
         raise HTTPException(
             status_code=500,
             detail=str(error),
         )
+
