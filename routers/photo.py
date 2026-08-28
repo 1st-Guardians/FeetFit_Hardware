@@ -1,0 +1,135 @@
+from fastapi import (
+    APIRouter,
+    HTTPException
+)
+
+from models import MeasurementRequest
+
+from clients.backend_client import (
+    patch_status,
+    send_hardware_failed
+)
+
+from clients.ai_client import send_photo
+
+from errors import (
+    HardwareMeasurementError,
+    AIRequestNotAccepted
+)
+
+from hardware.camera import (
+    capture_all_photos
+)
+
+from hardware.led import (
+    led_on,
+    led_off
+)
+
+
+router = APIRouter()
+
+
+@router.post(
+    "/measurement/photo/start",
+    status_code=202
+)
+def photo_start(
+    request: MeasurementRequest
+):
+
+    session_id = (
+        request.measurementSessionId
+    )
+
+
+    try:
+
+        patch_status(
+            session_id,
+            "CAPTURING_PHOTO"
+        )
+
+
+        try:
+
+            led_on()
+
+            photos = (
+                capture_all_photos(
+                    session_id
+                )
+            )
+
+        finally:
+
+            led_off()
+
+
+        # AI 전달
+        ai_result = send_photo(
+            session_id,
+            photos
+        )
+
+
+        # AI가 202 성공했을 때만
+        patch_status(
+            session_id,
+            "WAITING_FOR_ENVIRONMENT"
+        )
+
+
+        return {
+            "accepted": True,
+
+            "measurementSessionId":
+                session_id,
+
+            "status":
+                "WAITING_FOR_ENVIRONMENT",
+
+            "aiRequestId":
+                ai_result.get("requestId")
+        }
+
+
+    # ==============================================
+    # 실제 하드웨어 촬영 실패
+    # -> Backend FAILED 전송
+    # ==============================================
+
+    except HardwareMeasurementError as e:
+
+        send_hardware_failed(
+            session_id,
+            e.reason,
+            e.message,
+            e.detail
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=e.message
+        )
+
+
+    # ==============================================
+    # AI가 202를 주지 않음
+    #
+    # Backend FAILED 보내지 않음
+    # WAITING_FOR_ENVIRONMENT도 보내지 않음
+    # 여기서 중단
+    # ==============================================
+
+    except AIRequestNotAccepted as e:
+
+        print(
+            "[PHOTO AI STOP]",
+            e.detail
+        )
+
+        raise HTTPException(
+            status_code=502,
+            detail=e.detail
+        )
