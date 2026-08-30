@@ -44,7 +44,6 @@ RIGHT_BASELINE = [
 
 # =========================================================
 # Baseline Noise
-# Diagnostic reference only
 # =========================================================
 
 LEFT_NOISE_STD = [
@@ -61,14 +60,20 @@ RIGHT_NOISE_STD = [
 
 
 # =========================================================
-# Calibration Configuration
+# Screening Configuration
 # =========================================================
 
 # Change this value if the actual measured mass is different
-CALIBRATION_MASS_G = 1000.0
+CALIBRATION_MASS_G = 2000.0
+
+# Channels that showed weak or unstable response at 1 kg
+SCREENING_CHANNELS = [
+    3, 4, 5, 6,
+    8, 9, 10, 11
+]
 
 PRECONDITION_CYCLES = 3
-TRIALS_PER_CHANNEL = 5
+TRIALS_PER_CHANNEL = 3
 
 LOAD_SETTLE_SECONDS = 2.0
 MEASUREMENT_SECONDS = 3.0
@@ -186,7 +191,7 @@ def read_channel(
         GPIO.HIGH
     )
 
-    # Disable target MUX before channel switching
+    # Disable target MUX before switching
     GPIO.output(
         enable_pin,
         GPIO.HIGH
@@ -219,7 +224,7 @@ def read_channel(
             ADC_SETTLE_TIME
         )
 
-    # Collect stable ADC readings
+    # Collect stable readings
     samples = []
 
     for _ in range(VALID_READS):
@@ -256,22 +261,20 @@ def read_full_scan(
 
     for channel in range(12):
 
-        value = read_channel(
-            channel,
-            enable_pin,
-            other_enable_pin,
-            adc
-        )
-
         values.append(
-            value
+            read_channel(
+                channel,
+                enable_pin,
+                other_enable_pin,
+                adc
+            )
         )
 
     return values
 
 
 # =========================================================
-# Measure For Fixed Duration
+# Measure Average
 # =========================================================
 
 def measure_average(
@@ -298,16 +301,13 @@ def measure_average(
         )
 
         for channel in range(12):
-
-            sums[channel] += (
-                values[channel]
-            )
+            sums[channel] += values[channel]
 
         scan_count += 1
 
     averages = [
-        sums[channel] / scan_count
-        for channel in range(12)
+        value / scan_count
+        for value in sums
     ]
 
     return averages, scan_count
@@ -331,11 +331,8 @@ def apply_baseline(
             - baseline[channel]
         )
 
-        if value < 0:
-            value = 0.0
-
         corrected.append(
-            value
+            max(value, 0.0)
         )
 
     return corrected
@@ -350,53 +347,30 @@ def find_strongest_other(
     target_channel
 ):
 
-    candidates = []
+    candidates = [
+        (corrected[channel], channel)
+        for channel in range(12)
+        if channel != target_channel
+    ]
 
-    for channel in range(12):
-
-        if channel == target_channel:
-            continue
-
-        candidates.append(
-            (
-                corrected[channel],
-                channel
-            )
-        )
-
-    strongest_value, strongest_channel = max(
+    value, channel = max(
         candidates
     )
 
-    return (
-        strongest_channel,
-        strongest_value
-    )
+    return channel, value
 
 
 # =========================================================
 # Preconditioning
 # =========================================================
 
-def precondition_channel(
-    foot_name,
+def precondition(
     target_channel
 ):
 
     print()
-    print("-" * 72)
     print(
-        f"{foot_name} C{target_channel:02d} Preconditioning"
-    )
-    print("-" * 72)
-
-    print()
-    print(
-        f"Preconditioning cycles: {PRECONDITION_CYCLES}"
-    )
-
-    print(
-        "Preconditioning values are not recorded."
+        f"Preconditioning C{target_channel:02d}"
     )
 
     for cycle in range(
@@ -406,16 +380,13 @@ def precondition_channel(
 
         print()
         print(
-            f"Preconditioning {cycle}/{PRECONDITION_CYCLES}"
+            f"Preconditioning "
+            f"{cycle}/{PRECONDITION_CYCLES}"
         )
 
         input(
-            f"Place the calibration mass on C{target_channel:02d}, "
+            f"Place the 2 kg load on C{target_channel:02d}, "
             "then press Enter: "
-        )
-
-        print(
-            f"Hold the load for {LOAD_SETTLE_SECONDS:.0f} seconds..."
         )
 
         time.sleep(
@@ -423,71 +394,43 @@ def precondition_channel(
         )
 
         input(
-            "Remove the calibration mass, then press Enter: "
+            "Remove the load, then press Enter: "
         )
 
         print(
             f"Waiting {RECOVERY_SECONDS:.0f} seconds "
-            "for sensor recovery..."
+            "for recovery..."
         )
 
         time.sleep(
             RECOVERY_SECONDS
         )
 
-    print()
-    print(
-        "Preconditioning completed."
-    )
-
 
 # =========================================================
-# Calibrate One Foot
+# Screening One Foot
 # =========================================================
 
-def calibrate_foot(
+def run_screening(
     foot_name,
     enable_pin,
     other_enable_pin,
     adc,
     baseline,
     noise_std,
-    trial_writer,
-    summary_writer
+    writer
 ):
 
+    all_results = []
+
     print()
     print("=" * 72)
     print(
-        f"{foot_name} Foot Sensitivity Calibration"
+        f"{foot_name} Foot 2 kg Screening"
     )
     print("=" * 72)
 
-    print()
-    print(
-        f"Calibration mass: {CALIBRATION_MASS_G:.1f} g"
-    )
-
-    print(
-        f"Preconditioning cycles: {PRECONDITION_CYCLES}"
-    )
-
-    print(
-        f"Recorded trials per channel: {TRIALS_PER_CHANNEL}"
-    )
-
-    print()
-
-    channel_mean_responses = []
-
-
-    # =====================================================
-    # C0 ~ C11
-    # =====================================================
-
-    for target_channel in range(12):
-
-        trial_responses = []
+    for target_channel in SCREENING_CHANNELS:
 
         print()
         print("=" * 72)
@@ -496,27 +439,16 @@ def calibrate_foot(
         )
         print("=" * 72)
 
-
-        # =================================================
-        # Preconditioning
-        # =================================================
-
-        precondition_channel(
-            foot_name,
+        precondition(
             target_channel
         )
+
+        trial_values = []
 
 
         # =================================================
         # Recorded Trials
         # =================================================
-
-        print()
-        print("-" * 72)
-        print(
-            f"{foot_name} C{target_channel:02d} Recorded Calibration"
-        )
-        print("-" * 72)
 
         for trial in range(
             1,
@@ -529,7 +461,7 @@ def calibrate_foot(
             )
 
             input(
-                f"Place the calibration mass at the center of "
+                f"Place the 2 kg load at the center of "
                 f"C{target_channel:02d}, then press Enter: "
             )
 
@@ -566,7 +498,7 @@ def calibrate_foot(
                 corrected[target_channel]
             )
 
-            trial_responses.append(
+            trial_values.append(
                 target_corrected
             )
 
@@ -577,11 +509,6 @@ def calibrate_foot(
                 corrected,
                 target_channel
             )
-
-
-            # =================================================
-            # Trial Result
-            # =================================================
 
             print()
             print(
@@ -595,8 +522,7 @@ def calibrate_foot(
             )
 
             print(
-                f"Scan count: "
-                f"{scan_count}"
+                f"Scan count: {scan_count}"
             )
 
             print(
@@ -605,49 +531,13 @@ def calibrate_foot(
                 f"({strongest_other_value:.1f})"
             )
 
-            print()
-
-
-            # =================================================
-            # Save Trial CSV
-            # =================================================
-
-            row = [
-                foot_name,
-                target_channel,
-                trial,
-                CALIBRATION_MASS_G,
-                scan_count,
-                target_raw,
-                target_corrected,
-                strongest_other_channel,
-                strongest_other_value
-            ]
-
-            row.extend(
-                raw_average
-            )
-
-            row.extend(
-                corrected
-            )
-
-            trial_writer.writerow(
-                row
-            )
-
-
-            # =================================================
-            # Recovery
-            # =================================================
-
             input(
-                "Remove the calibration mass, then press Enter: "
+                "Remove the load, then press Enter: "
             )
 
             print(
                 f"Waiting {RECOVERY_SECONDS:.0f} seconds "
-                "for sensor recovery..."
+                "for recovery..."
             )
 
             time.sleep(
@@ -655,20 +545,20 @@ def calibrate_foot(
             )
 
 
-        # =====================================================
-        # Channel Statistics
-        # =====================================================
+        # =================================================
+        # Statistics
+        # =================================================
 
         mean_response = statistics.mean(
-            trial_responses
+            trial_values
         )
 
         median_response = statistics.median(
-            trial_responses
+            trial_values
         )
 
         std_response = statistics.stdev(
-            trial_responses
+            trial_values
         )
 
         if mean_response > 0:
@@ -681,19 +571,19 @@ def calibrate_foot(
 
         else:
 
-            cv_percent = 0.0
+            cv_percent = float("inf")
 
 
-        three_sigma = (
+        noise_3sigma = (
             noise_std[target_channel]
             * 3.0
         )
 
-        if three_sigma > 0:
+        if noise_3sigma > 0:
 
             signal_to_3sigma = (
                 mean_response
-                / three_sigma
+                / noise_3sigma
             )
 
         else:
@@ -701,31 +591,66 @@ def calibrate_foot(
             signal_to_3sigma = 0.0
 
 
-        channel_mean_responses.append(
-            mean_response
+        # =================================================
+        # Diagnostic Screening Flag
+        # =================================================
+
+        strong_signal = (
+            signal_to_3sigma >= 3.0
+        )
+
+        stable_repeatability = (
+            cv_percent <= 20.0
+        )
+
+        if (
+            strong_signal
+            and stable_repeatability
+        ):
+
+            screening_result = "GOOD"
+
+        elif strong_signal:
+
+            screening_result = "UNSTABLE"
+
+        else:
+
+            screening_result = "WEAK"
+
+
+        all_results.append(
+            {
+                "channel": target_channel,
+                "mean": mean_response,
+                "median": median_response,
+                "std": std_response,
+                "cv": cv_percent,
+                "three_sigma": noise_3sigma,
+                "signal_ratio": signal_to_3sigma,
+                "result": screening_result
+            }
         )
 
 
-        # =====================================================
-        # Channel Summary
-        # =====================================================
+        # =================================================
+        # Output
+        # =================================================
 
         print()
-        print("=" * 72)
+        print("-" * 72)
 
         print(
-            f"C{target_channel:02d} Calibration Summary"
+            f"C{target_channel:02d} Screening Summary"
         )
 
-        print("=" * 72)
-
-        print()
+        print("-" * 72)
 
         print(
             "Trial responses: "
             + ", ".join(
                 f"{value:.1f}"
-                for value in trial_responses
+                for value in trial_values
             )
         )
 
@@ -750,8 +675,8 @@ def calibrate_foot(
         )
 
         print(
-            f"3-sigma diagnostic reference: "
-            f"{three_sigma:.1f}"
+            f"3-sigma reference: "
+            f"{noise_3sigma:.1f}"
         )
 
         print(
@@ -759,140 +684,55 @@ def calibrate_foot(
             f"{signal_to_3sigma:.2f}"
         )
 
-        print()
-
-
-        summary_row = [
-            foot_name,
-            target_channel,
-            CALIBRATION_MASS_G
-        ]
-
-        summary_row.extend(
-            trial_responses
+        print(
+            f"Screening flag: "
+            f"{screening_result}"
         )
 
-        summary_row.extend(
+
+        writer.writerow(
             [
+                foot_name,
+                target_channel,
+                CALIBRATION_MASS_G,
+                trial_values[0],
+                trial_values[1],
+                trial_values[2],
                 mean_response,
                 median_response,
                 std_response,
                 cv_percent,
-                three_sigma,
-                signal_to_3sigma
+                noise_3sigma,
+                signal_to_3sigma,
+                screening_result
             ]
         )
 
-        summary_writer.writerow(
-            summary_row
-        )
-
 
     # =====================================================
-    # Relative Sensitivity Gain
-    # =====================================================
-
-    valid_responses = [
-        value
-        for value in channel_mean_responses
-        if value > 0
-    ]
-
-    reference_response = statistics.median(
-        valid_responses
-    )
-
-
-    gains = []
-
-    for response in channel_mean_responses:
-
-        if response > 0:
-
-            gain = (
-                reference_response
-                / response
-            )
-
-        else:
-
-            gain = 0.0
-
-        gains.append(
-            gain
-        )
-
-
-    # =====================================================
-    # Final Result
+    # Final Summary
     # =====================================================
 
     print()
     print("=" * 72)
-
     print(
-        f"{foot_name} Foot Final Calibration Result"
+        f"{foot_name} Foot Final Screening Summary"
     )
-
     print("=" * 72)
 
     print()
 
-    print(
-        f"Reference response: "
-        f"{reference_response:.1f}"
-    )
+    for result in all_results:
 
-    print()
-
-    print(
-        "CHANNEL_MEAN_RESPONSES = ["
-    )
-
-    print(
-        "    "
-        + ", ".join(
-            f"{value:.1f}"
-            for value in channel_mean_responses
+        print(
+            f"C{result['channel']:02d} | "
+            f"Mean {result['mean']:8.1f} | "
+            f"CV {result['cv']:6.1f}% | "
+            f"Signal/3sigma {result['signal_ratio']:5.2f} | "
+            f"{result['result']}"
         )
-    )
 
-    print(
-        "]"
-    )
-
-    print()
-
-    print(
-        "SENSITIVITY_GAINS = ["
-    )
-
-    print(
-        "    "
-        + ", ".join(
-            f"{value:.4f}"
-            for value in gains
-        )
-    )
-
-    print(
-        "]"
-    )
-
-    print()
-
-    print(
-        "Do not apply the gains yet."
-    )
-
-    print(
-        "Review repeatability and calibration quality first."
-    )
-
-    return (
-        channel_mean_responses,
-        gains
-    )
+    return all_results
 
 
 # =========================================================
@@ -902,192 +742,101 @@ def calibrate_foot(
 try:
 
     print("=" * 72)
-    print("FeetFit FSR Sensitivity Calibration")
+    print("FeetFit 2 kg FSR Screening Test")
     print("=" * 72)
+
+    print()
+    print(
+        "This test checks whether 2 kg is suitable "
+        "for final sensitivity calibration."
+    )
 
     print()
     print("L = Left foot")
     print("R = Right foot")
-    print("B = Both feet")
     print()
 
     selection = input(
-        "Select calibration target [L/R/B]: "
+        "Select foot [L/R]: "
     ).strip().upper()
 
-
-    # =====================================================
-    # CSV Files
-    # =====================================================
 
     timestamp = datetime.now().strftime(
         "%Y%m%d_%H%M%S"
     )
 
-    trial_filename = (
-        f"fsr_calibration_trials_{timestamp}.csv"
-    )
-
-    summary_filename = (
-        f"fsr_calibration_summary_{timestamp}.csv"
+    filename = (
+        f"fsr_2kg_screening_{timestamp}.csv"
     )
 
 
     with open(
-        trial_filename,
+        filename,
         "w",
         newline=""
-    ) as trial_file, open(
-        summary_filename,
-        "w",
-        newline=""
-    ) as summary_file:
+    ) as csv_file:
 
-        trial_writer = csv.writer(
-            trial_file
+        writer = csv.writer(
+            csv_file
         )
 
-        summary_writer = csv.writer(
-            summary_file
-        )
-
-
-        # =================================================
-        # Trial CSV Header
-        # =================================================
-
-        trial_header = [
-            "foot",
-            "target_channel",
-            "trial",
-            "mass_g",
-            "scan_count",
-            "target_raw_average",
-            "target_corrected",
-            "strongest_other_channel",
-            "strongest_other_corrected"
-        ]
-
-        for channel in range(12):
-
-            trial_header.append(
-                f"raw_C{channel:02d}"
-            )
-
-        for channel in range(12):
-
-            trial_header.append(
-                f"corrected_C{channel:02d}"
-            )
-
-        trial_writer.writerow(
-            trial_header
-        )
-
-
-        # =================================================
-        # Summary CSV Header
-        # =================================================
-
-        summary_header = [
-            "foot",
-            "channel",
-            "mass_g"
-        ]
-
-        for trial in range(
-            1,
-            TRIALS_PER_CHANNEL + 1
-        ):
-
-            summary_header.append(
-                f"trial_{trial}"
-            )
-
-        summary_header.extend(
+        writer.writerow(
             [
+                "foot",
+                "channel",
+                "mass_g",
+                "trial_1",
+                "trial_2",
+                "trial_3",
                 "mean_response",
                 "median_response",
                 "std_response",
                 "cv_percent",
                 "noise_3sigma",
-                "signal_to_3sigma"
+                "signal_to_3sigma",
+                "screening_flag"
             ]
         )
 
-        summary_writer.writerow(
-            summary_header
-        )
 
+        if selection == "L":
 
-        # =================================================
-        # Left Foot
-        # =================================================
-
-        if selection in [
-            "L",
-            "B"
-        ]:
-
-            calibrate_foot(
+            run_screening(
                 "Left",
                 EN_LEFT,
                 EN_RIGHT,
                 left_adc,
                 LEFT_BASELINE,
                 LEFT_NOISE_STD,
-                trial_writer,
-                summary_writer
+                writer
             )
 
+        elif selection == "R":
 
-        # =================================================
-        # Right Foot
-        # =================================================
-
-        if selection in [
-            "R",
-            "B"
-        ]:
-
-            calibrate_foot(
+            run_screening(
                 "Right",
                 EN_RIGHT,
                 EN_LEFT,
                 right_adc,
                 RIGHT_BASELINE,
                 RIGHT_NOISE_STD,
-                trial_writer,
-                summary_writer
+                writer
             )
 
-
-        if selection not in [
-            "L",
-            "R",
-            "B"
-        ]:
+        else:
 
             raise ValueError(
-                "Invalid calibration target."
+                "Invalid foot selection."
             )
 
 
     print()
     print("=" * 72)
-    print("Calibration Completed")
+    print("Screening Completed")
     print("=" * 72)
 
-    print()
-
     print(
-        f"Trial data saved: "
-        f"{trial_filename}"
-    )
-
-    print(
-        f"Summary data saved: "
-        f"{summary_filename}"
+        f"CSV saved: {filename}"
     )
 
 
@@ -1095,7 +844,7 @@ except KeyboardInterrupt:
 
     print()
     print(
-        "Calibration stopped by user."
+        "Screening stopped by user."
     )
 
 
@@ -1112,3 +861,4 @@ finally:
     )
 
     GPIO.cleanup()
+

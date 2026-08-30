@@ -1,0 +1,2 @@
+foot,channel,mass_g,trial_1,trial_2,trial_3,mean_response,median_response,std_response,cv_percent,noise_3sigma,signal_to_3sigma,screening_flag
+Left,3,2000.0,1790.1000000000001,1957.5,228.9,1325.5,1790.1000000000001,953.364757057864,71.92491565883546,214.20000000000002,6.18814192343604,UNSTABLE
