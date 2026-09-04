@@ -23,7 +23,10 @@ from clients.backend_client import (
     send_hardware_failed
 )
 
-
+from hardware.buzzer import (
+    buzzer_ready,
+    buzzer_error
+)
 router = APIRouter()
 
 
@@ -74,6 +77,7 @@ def measurement_start(
             beforeHumidity=
                 before["humidity"]
         )
+        buzzer_ready()
 
 
         return {

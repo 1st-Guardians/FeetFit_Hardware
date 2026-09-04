@@ -428,7 +428,7 @@ CAPTURE_DELAY_SECONDS = float(
 LED_GPIO_PIN = int(
     os.getenv(
         "LED_GPIO_PIN",
-        "18"
+        "26"
     )
 )
 
@@ -503,4 +503,20 @@ BME280_SAMPLE_INTERVAL_SECONDS = float(
         "BME280_SAMPLE_INTERVAL_SECONDS",
         "0.2"
     )
+)
+
+# =========================================================
+# Buzzer
+# =========================================================
+
+BUZZER_GPIO_PIN = int(
+    os.getenv(
+        "BUZZER_GPIO_PIN",
+        "16"
+    )
+)
+
+BUZZER_ACTIVE_HIGH = env_bool(
+    "BUZZER_ACTIVE_HIGH",
+    True
 )

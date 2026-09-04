@@ -2,7 +2,9 @@ from fastapi import (
     APIRouter,
     HTTPException
 )
-
+from hardware.buzzer import (
+    buzzer_error
+)
 from models import MeasurementRequest
 
 from hardware.pressure import (
@@ -106,9 +108,9 @@ def pressure_start(
     # ==============================================
     # 실제 압력센서 실패
     # ==============================================
-
+    
     except HardwareMeasurementError as e:
-
+        buzzer_error()
         send_hardware_failed(
             session_id,
             e.reason,
@@ -129,7 +131,7 @@ def pressure_start(
     # ==============================================
 
     except AIRequestNotAccepted as e:
-
+        buzzer_error()
         print(
             "[PRESSURE AI STOP]",
             e.detail

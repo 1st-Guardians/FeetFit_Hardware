@@ -61,26 +61,24 @@ def photo_start(
 
 
         try:
+    # LED ON
+    led_on()
 
-            # LED ON
-            led_on()
+    # ??? ??? ??? ???? ??? ??
+    time.sleep(
+        LED_STABILIZE_SECONDS
+    )
 
-            # ?? ???
-            time.sleep(
-                LED_STABILIZE_SECONDS
-            )
+    # LED? ?? ???? 3? ??? ?? ??
+    photos = (
+        capture_all_photos(
+            session_id
+        )
+    )
 
-            # LED? ?? ???? ?? ??
-            photos = (
-                capture_all_photos(
-                    session_id
-                )
-            )
-
-        finally:
-
-            # ?? ??/??? ???? LED OFF
-            led_off()
+finally:
+    # ?? ?? ?? ? LED OFF
+    led_off()
 
 
         # AI 전달

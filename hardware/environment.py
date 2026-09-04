@@ -189,18 +189,9 @@ def measure_environment() -> dict:
 
     try:
 
-        # -------------------------------------------------
-        # I2C BUS OPEN
-        # -------------------------------------------------
-
         bus = smbus2.SMBus(
             BME280_I2C_BUS
-        )
-
-
-        # -------------------------------------------------
-        # BME280 calibration data
-        # -------------------------------------------------
+       )
 
         calibration_params = (
             bme280.load_calibration_params(
@@ -209,21 +200,10 @@ def measure_environment() -> dict:
             )
         )
 
-
         temperatures = []
         humidities = []
 
-
-        # -------------------------------------------------
-        # 여러 번 측정 후 평균
-        #
-        # 순간 노이즈를 줄이기 위해
-        # 기본 5회 측정
-        # -------------------------------------------------
-
-        for index in range(
-            BME280_SAMPLE_COUNT
-        ):
+        for index in range (BME280_SAMPLE_COUNT):
 
             data = bme280.sample(
                 bus,
@@ -232,28 +212,18 @@ def measure_environment() -> dict:
             )
 
 
-            temperature = float(
-                data.temperature
-            )
+            temperature = float(data.temperature)
 
-            humidity = float(
-                data.humidity
-            )
-
+            humidity = float(data.humidity)
 
             validate_environment_measurement(
                 temperature,
                 humidity
             )
 
+            temperatures.append(temperature)
 
-            temperatures.append(
-                temperature
-            )
-
-            humidities.append(
-                humidity
-            )
+            humidities.append(humidity)
 
 
             print(
@@ -281,24 +251,10 @@ def measure_environment() -> dict:
         # 평균
         # -------------------------------------------------
 
-        average_temperature = (
-            sum(
-                temperatures
-            )
-            / len(
-                temperatures
-            )
-        )
+        average_temperature = (sum(temperatures) / len(temperatures))
 
 
-        average_humidity = (
-            sum(
-                humidities
-            )
-            / len(
-                humidities
-            )
-        )
+        average_humidity = (sum(humidities) / len(humidities))
 
 
         # -------------------------------------------------

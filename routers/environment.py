@@ -2,6 +2,10 @@ from fastapi import (
     APIRouter,
     HTTPException
 )
+from hardware.buzzer import (
+    buzzer_ready,
+    buzzer_error
+)
 
 from models import (
     EnvironmentMeasurementRequest
@@ -129,6 +133,7 @@ def environment_start(
             "WAITING_FOR_PRESSURE"
         )
 
+        buzzer_ready()
 
         update_session(
             session_id,
@@ -159,7 +164,7 @@ def environment_start(
     # ==============================================
 
     except HardwareMeasurementError as e:
-
+        buzzer_error()
         send_hardware_failed(
             session_id,
             e.reason,
@@ -180,7 +185,7 @@ def environment_start(
     # ==============================================
 
     except AIRequestNotAccepted as e:
-
+        buzzer_error()
         print(
             "[ENVIRONMENT AI STOP]",
             e.detail
