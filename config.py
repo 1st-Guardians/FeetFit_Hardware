@@ -39,6 +39,7 @@ def env_bool(
         )
     )
 
+
 # =========================================================
 # Backend
 # =========================================================
@@ -80,14 +81,20 @@ AI_TIMEOUT_SECONDS = int(
 #
 # 현재 USB 물리 연결 기준
 #
-# LEFT
-# Raspberry Pi 직접 연결
+# LEFT Arducam
+# USB 1.2
+# /dev/video0
 #
-# RIGHT
-# 유전원 허브
+# RIGHT Arducam
+# USB 1.1.1
+# /dev/video2
 #
-# DORSAL
-# 유전원 허브 일반 웹캠
+# DORSAL Webcam
+# USB 1.1.4
+# /dev/video4
+#
+# /dev/videoN 번호가 변경되어도
+# 동일한 USB 물리 포트를 사용하도록 by-path 사용
 # =========================================================
 
 
@@ -109,7 +116,7 @@ LEFT_CAMERA_DEVICE = os.getenv(
 LEFT_IMAGE_WIDTH = int(
     os.getenv(
         "LEFT_IMAGE_WIDTH",
-        "1280"
+        "3264"
     )
 )
 
@@ -117,7 +124,7 @@ LEFT_IMAGE_WIDTH = int(
 LEFT_IMAGE_HEIGHT = int(
     os.getenv(
         "LEFT_IMAGE_HEIGHT",
-        "720"
+        "2448"
     )
 )
 
@@ -125,7 +132,7 @@ LEFT_IMAGE_HEIGHT = int(
 LEFT_CAMERA_FRAMERATE = int(
     os.getenv(
         "LEFT_CAMERA_FRAMERATE",
-        "30"
+        "15"
     )
 )
 
@@ -140,7 +147,7 @@ RIGHT_CAMERA_DEVICE = os.getenv(
         "/dev/v4l/by-path/"
         "platform-fd500000.pcie-"
         "pci-0000:01:00.0-"
-        "usb-0:1.1.4:1.0-video-index0"
+        "usb-0:1.1.1:1.0-video-index0"
     )
 )
 
@@ -148,7 +155,7 @@ RIGHT_CAMERA_DEVICE = os.getenv(
 RIGHT_IMAGE_WIDTH = int(
     os.getenv(
         "RIGHT_IMAGE_WIDTH",
-        "1280"
+        "3264"
     )
 )
 
@@ -156,7 +163,7 @@ RIGHT_IMAGE_WIDTH = int(
 RIGHT_IMAGE_HEIGHT = int(
     os.getenv(
         "RIGHT_IMAGE_HEIGHT",
-        "720"
+        "2448"
     )
 )
 
@@ -164,9 +171,11 @@ RIGHT_IMAGE_HEIGHT = int(
 RIGHT_CAMERA_FRAMERATE = int(
     os.getenv(
         "RIGHT_CAMERA_FRAMERATE",
-        "30"
+        "15"
     )
 )
+
+
 # ---------------------------------------------------------
 # DORSAL 일반 웹캠
 # ---------------------------------------------------------
@@ -177,7 +186,7 @@ DORSAL_CAMERA_DEVICE = os.getenv(
         "/dev/v4l/by-path/"
         "platform-fd500000.pcie-"
         "pci-0000:01:00.0-"
-        "usb-0:1.1.3:1.0-video-index0"
+        "usb-0:1.1.4:1.0-video-index0"
     )
 )
 
@@ -207,15 +216,43 @@ DORSAL_CAMERA_FRAMERATE = int(
 
 
 # =========================================================
-# Arducam 보정
+# Arducam 촬영 설정
 #
-# 현재 테스트 기준
+# 현재 기준
 #
-# Manual Exposure
-# Exposure = 100
-# Gain = 0
-# Auto White Balance
+# 해상도:
+# 3264 x 2448
+#
+# Auto Exposure:
+# OFF / Manual
+#
+# Exposure:
+# 200
+# → LED 배치 확정 후 최종 조정
+#
+# Gain:
+# 0
+#
+# Auto White Balance:
+# ON
+#
+# Auto Focus:
+# OFF
+#
+# Focus:
+# 350
+#
+# Sharpness:
+# 3
 # =========================================================
+
+
+# ---------------------------------------------------------
+# 노출
+#
+# Arducam V4L2에서
+# auto_exposure=1 → Manual Exposure
+# ---------------------------------------------------------
 
 ARDUCAM_AUTO_EXPOSURE = int(
     os.getenv(
@@ -228,7 +265,7 @@ ARDUCAM_AUTO_EXPOSURE = int(
 ARDUCAM_EXPOSURE = int(
     os.getenv(
         "ARDUCAM_EXPOSURE",
-        "100"
+        "200"
     )
 )
 
@@ -257,7 +294,7 @@ ARDUCAM_EXPOSURE_DYNAMIC_FRAMERATE = int(
 )
 
 
-# 대한민국 60Hz
+# 대한민국 상용 전원 주파수 60 Hz
 ARDUCAM_POWER_LINE_FREQUENCY = int(
     os.getenv(
         "ARDUCAM_POWER_LINE_FREQUENCY",
@@ -266,11 +303,22 @@ ARDUCAM_POWER_LINE_FREQUENCY = int(
 )
 
 
+# ---------------------------------------------------------
+# White Balance
+#
+# 수동 WB에서 초록빛 문제가 있었으므로
+# Auto White Balance 사용
+# ---------------------------------------------------------
+
 ARDUCAM_AUTO_WHITE_BALANCE = env_bool(
     "ARDUCAM_AUTO_WHITE_BALANCE",
     True
 )
 
+
+# ---------------------------------------------------------
+# 색상 / 이미지 설정
+# ---------------------------------------------------------
 
 ARDUCAM_BRIGHTNESS = int(
     os.getenv(
@@ -328,6 +376,13 @@ ARDUCAM_SHARPNESS = int(
 )
 
 
+# ---------------------------------------------------------
+# Focus
+#
+# Auto Focus OFF
+# Manual Focus 350
+# ---------------------------------------------------------
+
 ARDUCAM_AUTO_FOCUS = int(
     os.getenv(
         "ARDUCAM_AUTO_FOCUS",
@@ -339,10 +394,14 @@ ARDUCAM_AUTO_FOCUS = int(
 ARDUCAM_FOCUS_ABSOLUTE = int(
     os.getenv(
         "ARDUCAM_FOCUS_ABSOLUTE",
-        "144"
+        "350"
     )
 )
 
+
+# ---------------------------------------------------------
+# Arducam 설정 적용 후 안정화 시간
+# ---------------------------------------------------------
 
 ARDUCAM_CONTROL_SETTLE_SECONDS = float(
     os.getenv(
@@ -352,19 +411,26 @@ ARDUCAM_CONTROL_SETTLE_SECONDS = float(
 )
 
 
+# 서버 시작 시 Arducam 설정 적용
 ARDUCAM_CONFIGURE_ON_STARTUP = env_bool(
     "ARDUCAM_CONFIGURE_ON_STARTUP",
     True
 )
 
 
+# 실제 촬영 직전 Arducam 설정 재적용
 ARDUCAM_CONFIGURE_BEFORE_CAPTURE = env_bool(
     "ARDUCAM_CONFIGURE_BEFORE_CAPTURE",
     True
 )
 
+
 # =========================================================
-# Auto White Balance warmup
+# Auto White Balance Warmup
+#
+# 스트림을 시작한 직후에는
+# Auto WB가 완전히 안정화되지 않을 수 있으므로
+# 초기 프레임을 버린 뒤 사진 저장
 # =========================================================
 
 CAMERA_WARMUP_FRAMES = int(
@@ -377,6 +443,16 @@ CAMERA_WARMUP_FRAMES = int(
 
 # =========================================================
 # 카메라 전환 대기
+#
+# LEFT 촬영
+# ↓
+# 대기
+# ↓
+# RIGHT 촬영
+# ↓
+# 대기
+# ↓
+# DORSAL 촬영
 # =========================================================
 
 CAMERA_SWITCH_DELAY_SECONDS = float(
@@ -411,6 +487,8 @@ PHOTO_DIR.mkdir(
 
 # =========================================================
 # 사진 촬영 전 대기
+#
+# 사진 측정 API 호출 후 실제 촬영까지 대기 시간
 # =========================================================
 
 CAPTURE_DELAY_SECONDS = float(
@@ -423,6 +501,16 @@ CAPTURE_DELAY_SECONDS = float(
 
 # =========================================================
 # LED
+#
+# GPIO26
+#
+# LED ON
+# ↓
+# 2초 안정화
+# ↓
+# 카메라 촬영
+# ↓
+# LED OFF
 # =========================================================
 
 LED_GPIO_PIN = int(
@@ -442,7 +530,7 @@ LED_ACTIVE_HIGH = env_bool(
 LED_STABILIZE_SECONDS = float(
     os.getenv(
         "LED_STABILIZE_SECONDS",
-        "1"
+        "2"
     )
 )
 
@@ -453,7 +541,7 @@ LED_STABILIZE_SECONDS = float(
 # 실제 센서 연결 전:
 # true
 #
-# 실제 압력/온습도 코드 연결 후:
+# 실제 압력 / 온습도 코드 연결 후:
 # false
 # =========================================================
 
@@ -462,15 +550,15 @@ USE_MOCK_SENSORS = env_bool(
     True
 )
 
+
 # =========================================================
 # BME280 온습도 센서
 #
-# PDF 하드웨어 정의 기준
-# - I2C Bus: 1
-# - Address: 0x76
-# - SDA: GPIO2
-# - SCL: GPIO3
-# - Power: 3.3V
+# I2C Bus: 1
+# Address: 0x76
+# SDA: GPIO2
+# SCL: GPIO3
+# Power: 3.3V
 # =========================================================
 
 BME280_I2C_BUS = int(
@@ -505,6 +593,7 @@ BME280_SAMPLE_INTERVAL_SECONDS = float(
     )
 )
 
+
 # =========================================================
 # Buzzer
 # =========================================================
@@ -515,6 +604,7 @@ BUZZER_GPIO_PIN = int(
         "16"
     )
 )
+
 
 BUZZER_ACTIVE_HIGH = env_bool(
     "BUZZER_ACTIVE_HIGH",

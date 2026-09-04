@@ -1,4 +1,3 @@
-import shutil
 import subprocess
 import time
 
@@ -6,27 +5,27 @@ from pathlib import Path
 from threading import Lock
 
 from config import (
-    # Camera devices
+    # 카메라 장치
     LEFT_CAMERA_DEVICE,
     RIGHT_CAMERA_DEVICE,
     DORSAL_CAMERA_DEVICE,
 
-    # Left
+    # 왼발
     LEFT_IMAGE_WIDTH,
     LEFT_IMAGE_HEIGHT,
     LEFT_CAMERA_FRAMERATE,
 
-    # Right
+    # 오른발
     RIGHT_IMAGE_WIDTH,
     RIGHT_IMAGE_HEIGHT,
     RIGHT_CAMERA_FRAMERATE,
 
-    # Dorsal
+    # 상단
     DORSAL_IMAGE_WIDTH,
     DORSAL_IMAGE_HEIGHT,
     DORSAL_CAMERA_FRAMERATE,
 
-    # Arducam
+    # Arducam 설정
     ARDUCAM_AUTO_EXPOSURE,
     ARDUCAM_EXPOSURE,
     ARDUCAM_GAIN,
@@ -47,7 +46,7 @@ from config import (
     ARDUCAM_CONFIGURE_BEFORE_CAPTURE,
     ARDUCAM_CONFIGURE_ON_STARTUP,
 
-    # Capture
+    # 촬영
     CAMERA_WARMUP_FRAMES,
     CAMERA_SWITCH_DELAY_SECONDS,
     PHOTO_DIR,
@@ -57,28 +56,24 @@ from errors import HardwareMeasurementError
 
 
 # =========================================================
-# Camera Lock
+# 카메라 Lock
 #
-# 여러 측정 요청이 동시에 들어와도
-# 카메라는 한 측정 세션에서만 사용
+# 서로 다른 측정 세션에서 동시에 카메라 API가 호출되어도
+# 한 번에 하나의 촬영 흐름만 실행 
 # =========================================================
 
 camera_lock = Lock()
 
-
 # =========================================================
-# Arducam Configuration
+# Arducam 설정 적용
 #
-# 현재 설정:
+# 왼발 / 오른발 Arducam에만 사용
 #
-# Resolution : 3264 x 2448
-# Exposure   : Manual
-# Exposure   : .env 값 사용
-# Gain       : 0
-# Sharpness  : 3
-# Auto Focus : OFF
-# Focus      : 350
-# Auto WB    : ON
+# 현재 정상 색으로 확인한 값:
+# - Manual Exposure
+# - Exposure 100
+# - Gain 0
+# - Auto White Balance
 # =========================================================
 
 def configure_arducam(
@@ -86,20 +81,30 @@ def configure_arducam(
     camera_name: str
 ):
 
+    # -----------------------------------------------------
+    # 장치 존재 여부
+    # -----------------------------------------------------
+
     if not Path(device).exists():
 
         raise HardwareMeasurementError(
             reason="DEVICE_DISCONNECTED",
+
             message=(
-                "사진 촬영에 실패했습니다. "
-                "다시 시도해주세요."
+                "?? ??? ??????. "
+                "?? ??????."
             ),
+
             detail=(
-                f"{camera_name} Arducam 장치를 "
-                f"찾을 수 없습니다: {device}"
+                f"{camera_name} Arducam ??? "
+                f"?? ? ????: {device}"
             )
         )
 
+
+    # -----------------------------------------------------
+    # v4l2 control
+    # -----------------------------------------------------
 
     controls = [
 
@@ -164,53 +169,62 @@ def configure_arducam(
 
 
     command = [
+
         "v4l2-ctl",
+
         "-d",
         device,
+
         "--set-ctrl="
         + ",".join(controls)
     ]
 
 
     print()
-    print("=" * 72)
     print(
-        f"[ARDUCAM CONFIG] "
-        f"{camera_name}"
+        "========================================"
     )
+
+    print(
+        f"[ARDUCAM CONFIG] {camera_name}"
+    )
+
     print(
         f"[DEVICE] {device}"
     )
-    print(
-        f"[EXPOSURE] "
-        f"{ARDUCAM_EXPOSURE}"
-    )
-    print(
-        f"[GAIN] "
-        f"{ARDUCAM_GAIN}"
-    )
-    print(
-        f"[SHARPNESS] "
-        f"{ARDUCAM_SHARPNESS}"
-    )
-    print(
-        f"[FOCUS] "
-        f"{ARDUCAM_FOCUS_ABSOLUTE}"
-    )
-    print(
-        f"[AUTO WB] "
-        f"{ARDUCAM_AUTO_WHITE_BALANCE}"
-    )
-    print("=" * 72)
 
+    print(
+        f"[EXPOSURE] {ARDUCAM_EXPOSURE}"
+    )
+
+    print(
+        f"[GAIN] {ARDUCAM_GAIN}"
+    )
+
+    print(
+        f"[AUTO WB] {ARDUCAM_AUTO_WHITE_BALANCE}"
+    )
+
+    print(
+        "========================================"
+    )
+
+    # -----------------------------------------------------
+    # 설정 실행
+    # -----------------------------------------------------
 
     try:
 
         result = subprocess.run(
+
             command,
+
             stdout=subprocess.PIPE,
+
             stderr=subprocess.PIPE,
+
             text=True,
+
             timeout=5
         )
 
@@ -219,13 +233,14 @@ def configure_arducam(
 
         raise HardwareMeasurementError(
             reason="CAMERA_ERROR",
+
             message=(
                 "사진 촬영에 실패했습니다. "
                 "다시 시도해주세요."
             ),
+
             detail=(
-                "v4l2-ctl 명령을 "
-                "찾을 수 없습니다."
+                "v4l2-ctl 명령을 찾을 수 없습니다."
             )
         )
 
@@ -234,32 +249,43 @@ def configure_arducam(
 
         raise HardwareMeasurementError(
             reason="CAMERA_ERROR",
+
             message=(
                 "사진 촬영에 실패했습니다. "
                 "다시 시도해주세요."
             ),
+
             detail=(
-                f"{camera_name} "
-                "Arducam 설정 timeout"
+                f"{camera_name} Arducam "
+                "설정 timeout"
             )
         )
 
+
+    # -----------------------------------------------------
+    # v4l2 설정 자체 실패
+    # -----------------------------------------------------
 
     if result.returncode != 0:
 
         raise HardwareMeasurementError(
             reason="CAMERA_ERROR",
+
             message=(
                 "사진 촬영에 실패했습니다. "
                 "다시 시도해주세요."
             ),
+
             detail=(
-                f"{camera_name} "
-                f"Arducam 설정 실패: "
+                f"{camera_name} Arducam 설정 실패: "
                 f"{result.stderr.strip()}"
             )
         )
 
+
+    # -----------------------------------------------------
+    # 설정 안정화
+    # -----------------------------------------------------
 
     if (
         ARDUCAM_CONTROL_SETTLE_SECONDS
@@ -275,17 +301,19 @@ def configure_arducam(
         f"[ARDUCAM CONFIG COMPLETE] "
         f"{camera_name}"
     )
-
-
 # =========================================================
-# Server Startup Configuration
+# 서버 시작 시 Arducam 초기 설정
+#
+# main.py startup에서 호출
+#
+# 여기서는 서버 자체를 죽이지 않고 warning만 출력.
+# 실제 촬영 직전에 configure_arducam()을 다시 호출함.
 # =========================================================
 
 def configure_arducams_on_startup():
 
     if not ARDUCAM_CONFIGURE_ON_STARTUP:
         return
-
 
     cameras = [
 
@@ -316,47 +344,26 @@ def configure_arducams_on_startup():
 
         except HardwareMeasurementError as e:
 
-            # 서버 자체는 계속 실행.
-            # 실제 촬영 직전에 다시 설정 시도.
             print()
             print(
                 "[ARDUCAM STARTUP WARNING]"
             )
+
             print(
-                f"Camera : "
-                f"{camera_name}"
+                f"Camera : {camera_name}"
             )
+
             print(
-                f"Reason : "
-                f"{e.reason}"
+                f"Reason : {e.reason}"
             )
+
             print(
-                f"Detail : "
-                f"{e.detail}"
+                f"Detail : {e.detail}"
             )
 
 
 # =========================================================
-# Capture One Camera
-#
-# 중요:
-#
-# Input:
-#   MJPEG
-#
-# 기존 방식:
-#   MJPEG
-#   -> decode
-#   -> select filter
-#   -> JPEG 재인코딩
-#
-# 현재 방식:
-#   MJPEG
-#   -> codec copy
-#   -> 원본 JPEG frame 저장
-#
-# Auto WB 안정화를 위해 처음 N개 frame을 받은 뒤
-# 마지막 원본 MJPEG frame만 최종 이미지로 사용
+# 카메라 한 대 촬영
 # =========================================================
 
 def capture_photo(
@@ -370,17 +377,21 @@ def capture_photo(
 
 
     # -----------------------------------------------------
-    # Camera existence
+    # 장치 존재 확인
     # -----------------------------------------------------
 
-    if not Path(device).exists():
+    if not Path(
+        device
+    ).exists():
 
         raise HardwareMeasurementError(
             reason="DEVICE_DISCONNECTED",
+
             message=(
                 "사진 촬영에 실패했습니다. "
                 "다시 시도해주세요."
             ),
+
             detail=(
                 f"{camera_name} 카메라 장치를 "
                 f"찾을 수 없습니다: {device}"
@@ -389,65 +400,33 @@ def capture_photo(
 
 
     # -----------------------------------------------------
-    # Filename
+    # 파일명
     # -----------------------------------------------------
 
-    timestamp = (
-        time.strftime(
-            "%Y%m%d_%H%M%S"
-        )
+    timestamp = time.strftime(
+        "%Y%m%d_%H%M%S"
     )
 
 
     filename = (
+
         PHOTO_DIR
+
         / (
+
             f"session_{session_id}_"
+
             f"{camera_name}_"
+
             f"{timestamp}.jpg"
         )
     )
 
 
-    # -----------------------------------------------------
-    # Temporary directory
-    #
-    # warmup frame들도 원본 MJPEG 그대로 임시 저장한 뒤
-    # 마지막 frame 하나만 최종 파일로 남김
-    # -----------------------------------------------------
-
-    temp_dir = (
-        PHOTO_DIR
-        / (
-            f".capture_"
-            f"{session_id}_"
-            f"{camera_name}_"
-            f"{time.time_ns()}"
-        )
-    )
-
-
-    temp_dir.mkdir(
-        parents=True,
-        exist_ok=True
-    )
-
-
-    temp_pattern = (
-        temp_dir
-        / "frame_%03d.jpg"
-    )
-
-
-    # 최소 1 frame
-    frame_count = max(
-        1,
-        CAMERA_WARMUP_FRAMES + 1
-    )
-
-
     print()
-    print("=" * 72)
+    print(
+        "========================================"
+    )
 
     print(
         f"[CAMERA] {camera_name}"
@@ -467,24 +446,11 @@ def capture_photo(
     )
 
     print(
-        "[FORMAT] MJPEG ORIGINAL"
+        "========================================"
     )
-
-    print(
-        f"[WARMUP] "
-        f"{CAMERA_WARMUP_FRAMES} frames"
-    )
-
-    print("=" * 72)
-
 
     # -----------------------------------------------------
-    # FFmpeg
-    #
-    # -c:v copy
-    #
-    # ★ 디코딩 / 필터 / 재인코딩 없음
-    # ★ 카메라가 출력한 MJPEG packet 그대로 저장
+    # ffmpeg 명령
     # -----------------------------------------------------
 
     command = [
@@ -510,49 +476,76 @@ def capture_photo(
 
         "-i",
         device,
+    ]
 
-        "-map",
-        "0:v:0",
 
-        "-c:v",
-        "copy",
+    # -----------------------------------------------------
+    # Auto WB 안정화용 warmup
+    #
+    # 처음 N frame 버리고 다음 프레임 저장
+    # -----------------------------------------------------
+
+    if CAMERA_WARMUP_FRAMES > 0:
+
+        command.extend([
+
+            "-vf",
+
+            (
+                "select="
+                f"gte(n\\,{CAMERA_WARMUP_FRAMES})"
+            )
+        ])
+
+
+    # -----------------------------------------------------
+    # JPEG 한 장 저장
+    # -----------------------------------------------------
+
+    command.extend([
 
         "-frames:v",
-        str(frame_count),
+        "1",
 
-        "-f",
-        "image2",
+        "-q:v",
+        "2",
 
         "-y",
 
-        str(temp_pattern)
-    ]
+        str(filename)
+    ])
 
+
+    # -----------------------------------------------------
+    # ffmpeg 실행
+    # -----------------------------------------------------
 
     try:
 
         result = subprocess.run(
+
             command,
+
             stdout=subprocess.PIPE,
+
             stderr=subprocess.PIPE,
+
             text=True,
+
             timeout=30
         )
 
 
     except subprocess.TimeoutExpired:
 
-        shutil.rmtree(
-            temp_dir,
-            ignore_errors=True
-        )
-
         raise HardwareMeasurementError(
             reason="CAMERA_ERROR",
+
             message=(
                 "사진 촬영에 실패했습니다. "
                 "다시 시도해주세요."
             ),
+
             detail=(
                 f"{camera_name} "
                 "카메라 촬영 timeout"
@@ -562,169 +555,80 @@ def capture_photo(
 
     except FileNotFoundError:
 
-        shutil.rmtree(
-            temp_dir,
-            ignore_errors=True
-        )
-
         raise HardwareMeasurementError(
             reason="CAMERA_ERROR",
+
             message=(
                 "사진 촬영에 실패했습니다. "
                 "다시 시도해주세요."
             ),
+
             detail=(
-                "ffmpeg 명령을 "
-                "찾을 수 없습니다."
+                "ffmpeg 명령을 찾을 수 없습니다."
             )
         )
-
-
     # -----------------------------------------------------
-    # FFmpeg failure
+    # ffmpeg 오류
     # -----------------------------------------------------
 
     if result.returncode != 0:
 
-        shutil.rmtree(
-            temp_dir,
-            ignore_errors=True
-        )
-
         raise HardwareMeasurementError(
             reason="CAMERA_ERROR",
+
             message=(
                 "사진 촬영에 실패했습니다. "
                 "다시 시도해주세요."
             ),
+
             detail=(
-                f"{camera_name} "
-                f"카메라 촬영 실패: "
+                f"{camera_name} 카메라 촬영 실패: "
                 f"{result.stderr.strip()}"
             )
         )
 
 
     # -----------------------------------------------------
-    # Get captured frames
+    # 파일 검증
     # -----------------------------------------------------
 
-    frame_files = sorted(
-        temp_dir.glob(
-            "frame_*.jpg"
-        )
-    )
-
-
-    if not frame_files:
-
-        shutil.rmtree(
-            temp_dir,
-            ignore_errors=True
-        )
+    if not filename.exists():
 
         raise HardwareMeasurementError(
             reason="CAMERA_ERROR",
+
             message=(
                 "사진 촬영에 실패했습니다. "
                 "다시 시도해주세요."
             ),
+
             detail=(
                 f"{camera_name} "
-                "MJPEG frame이 생성되지 않았습니다."
+                "이미지 파일이 생성되지 않았습니다."
             )
         )
 
 
-    # -----------------------------------------------------
-    # Last frame
-    #
-    # Auto WB warmup 이후 마지막 frame 사용
-    # -----------------------------------------------------
-
-    final_frame = frame_files[-1]
-
-
-    if (
-        not final_frame.exists()
-        or final_frame.stat().st_size == 0
-    ):
-
-        shutil.rmtree(
-            temp_dir,
-            ignore_errors=True
-        )
+    if filename.stat().st_size == 0:
 
         raise HardwareMeasurementError(
             reason="CAMERA_ERROR",
+
             message=(
                 "사진 촬영에 실패했습니다. "
                 "다시 시도해주세요."
             ),
+
             detail=(
                 f"{camera_name} "
-                "MJPEG frame 크기가 "
-                "0 byte입니다."
-            )
-        )
-
-
-    # -----------------------------------------------------
-    # Move original JPEG frame
-    #
-    # 파일 내용을 다시 인코딩하지 않고
-    # 마지막 MJPEG frame 파일 자체를 이동
-    # -----------------------------------------------------
-
-    shutil.move(
-        str(final_frame),
-        str(filename)
-    )
-
-
-    # 나머지 warmup frame 삭제
-    shutil.rmtree(
-        temp_dir,
-        ignore_errors=True
-    )
-
-
-    # -----------------------------------------------------
-    # Final validation
-    # -----------------------------------------------------
-
-    if (
-        not filename.exists()
-        or filename.stat().st_size == 0
-    ):
-
-        raise HardwareMeasurementError(
-            reason="CAMERA_ERROR",
-            message=(
-                "사진 촬영에 실패했습니다. "
-                "다시 시도해주세요."
-            ),
-            detail=(
-                f"{camera_name} "
-                "최종 이미지 저장 실패"
+                "이미지 파일 크기가 0 byte입니다."
             )
         )
 
 
     print()
     print(
-        f"[CAMERA SAVE] "
-        f"{filename}"
-    )
-
-    print(
-        f"[FILE SIZE] "
-        f"{filename.stat().st_size} bytes"
-    )
-
-    print(
-        "[ENCODING] "
-        "MJPEG ORIGINAL / NO RE-ENCODE"
+        f"[CAMERA SAVE] {filename}"
     )
 
 
@@ -732,17 +636,17 @@ def capture_photo(
 
 
 # =========================================================
-# Capture All Cameras
+# 카메라 3대 순차 촬영
 #
-# Sequence:
+# 순서:
 #
-# LEFT
-# ->
-# RIGHT
-# ->
-# DORSAL
+# LEFT Arducam
+# ?
+# RIGHT Arducam
+# ?
+# DORSAL Webcam
 #
-# 세 카메라를 동시에 스트리밍하지 않음
+# 동시에 카메라 스트림을 열지 않음.
 # =========================================================
 
 def capture_all_photos(
@@ -754,18 +658,25 @@ def capture_all_photos(
 
 
         print()
-        print("=" * 72)
+        print(
+            "========================================"
+        )
+
         print(
             "[CAMERA SEQUENCE START]"
         )
+
         print(
             "LEFT -> RIGHT -> DORSAL"
         )
-        print("=" * 72)
+
+        print(
+            "========================================"
+        )
 
 
         # =================================================
-        # 1. LEFT Arducam
+        # 1. LEFT
         # =================================================
 
         print()
@@ -774,9 +685,11 @@ def capture_all_photos(
         )
 
 
+        # 촬영 직전 Arducam 설정 재적용
         if ARDUCAM_CONFIGURE_BEFORE_CAPTURE:
 
             configure_arducam(
+
                 device=
                     LEFT_CAMERA_DEVICE,
 
@@ -812,15 +725,14 @@ def capture_all_photos(
         )
 
 
+        # 카메라 전환 안정화
         if CAMERA_SWITCH_DELAY_SECONDS > 0:
 
             time.sleep(
                 CAMERA_SWITCH_DELAY_SECONDS
             )
-
-
         # =================================================
-        # 2. RIGHT Arducam
+        # 2. RIGHT
         # =================================================
 
         print()
@@ -832,6 +744,7 @@ def capture_all_photos(
         if ARDUCAM_CONFIGURE_BEFORE_CAPTURE:
 
             configure_arducam(
+
                 device=
                     RIGHT_CAMERA_DEVICE,
 
@@ -875,7 +788,7 @@ def capture_all_photos(
 
 
         # =================================================
-        # 3. DORSAL Webcam
+        # 3. DORSAL
         # =================================================
 
         print()
@@ -912,11 +825,17 @@ def capture_all_photos(
 
 
         print()
-        print("=" * 72)
+        print(
+            "========================================"
+        )
+
         print(
             "[CAMERA SEQUENCE COMPLETE]"
         )
-        print("=" * 72)
+
+        print(
+            "========================================"
+        )
 
 
         return {
@@ -933,7 +852,7 @@ def capture_all_photos(
 
 
 # =========================================================
-# Camera Status
+# 카메라 상태 확인
 # =========================================================
 
 def get_camera_status():
@@ -948,13 +867,7 @@ def get_camera_status():
             "exists":
                 Path(
                     LEFT_CAMERA_DEVICE
-                ).exists(),
-
-            "resolution":
-                (
-                    f"{LEFT_IMAGE_WIDTH}"
-                    f"x{LEFT_IMAGE_HEIGHT}"
-                )
+                ).exists()
         },
 
 
@@ -966,13 +879,7 @@ def get_camera_status():
             "exists":
                 Path(
                     RIGHT_CAMERA_DEVICE
-                ).exists(),
-
-            "resolution":
-                (
-                    f"{RIGHT_IMAGE_WIDTH}"
-                    f"x{RIGHT_IMAGE_HEIGHT}"
-                )
+                ).exists()
         },
 
 
@@ -984,12 +891,6 @@ def get_camera_status():
             "exists":
                 Path(
                     DORSAL_CAMERA_DEVICE
-                ).exists(),
-
-            "resolution":
-                (
-                    f"{DORSAL_IMAGE_WIDTH}"
-                    f"x{DORSAL_IMAGE_HEIGHT}"
-                )
+                ).exists()
         }
     }
