@@ -2,13 +2,16 @@ from fastapi import (
     APIRouter,
     HTTPException
 )
-from hardware.buzzer import (
-    buzzer_error
-)
+
 from models import MeasurementRequest
 
 from hardware.pressure import (
     measure_pressure
+)
+
+from hardware.buzzer import (
+    buzzer_complete,
+    buzzer_error
 )
 
 from clients.ai_client import (
@@ -45,7 +48,7 @@ def pressure_start(
     try:
 
         # ==========================================
-        # 압력 측정 시작
+        # ?? ?? ??
         # ==========================================
 
         patch_status(
@@ -54,13 +57,17 @@ def pressure_start(
         )
 
 
+        # ==========================================
+        # ?? ?? ??
+        # ==========================================
+
         pressure = (
             measure_pressure()
         )
 
 
         # ==========================================
-        # AI 압력 분석
+        # AI ?? ?? ??
         # ==========================================
 
         ai_result = (
@@ -76,15 +83,24 @@ def pressure_start(
 
 
         # ==========================================
-        # AI가 202를 준 경우
+        # AI? 202 ?? ??? ??
         #
-        # 하드웨어 최종 단계
+        # ???? ?? ?? ??
         # ==========================================
 
         patch_status(
             session_id,
             "ANALYZING"
         )
+
+
+        # ==========================================
+        # ?? ???
+        #
+        # ? ? ???
+        # ==========================================
+
+        buzzer_complete()
 
 
         return {
@@ -106,17 +122,23 @@ def pressure_start(
 
 
     # ==============================================
-    # 실제 압력센서 실패
+    # ?? ?? ?? ??
+    #
+    # ??? - ???
     # ==============================================
-    
+
     except HardwareMeasurementError as e:
+
         buzzer_error()
+
+
         send_hardware_failed(
             session_id,
             e.reason,
             e.message,
             e.detail
         )
+
 
         raise HTTPException(
             status_code=500,
@@ -125,17 +147,22 @@ def pressure_start(
 
 
     # ==============================================
-    # AI ??
+    # AI ?? ??
     #
-    # ? FAILED PATCH ? ?
+    # ?????? FAILED ?? ??? ?? ??
+    # ???? ??
     # ==============================================
 
     except AIRequestNotAccepted as e:
+
         buzzer_error()
+
+
         print(
             "[PRESSURE AI STOP]",
             e.detail
         )
+
 
         raise HTTPException(
             status_code=502,

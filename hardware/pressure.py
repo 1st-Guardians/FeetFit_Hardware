@@ -12,6 +12,11 @@ import adafruit_ads1x15.ads1x15 as ADS1X15
 
 from adafruit_ads1x15.analog_in import AnalogIn
 
+from config import (
+    PRESSURE_FIXED_INPUT,
+    PRESSURE_FIXED_SCAN_COUNT
+)
+
 from errors import HardwareMeasurementError
 
 
@@ -31,19 +36,79 @@ EN_RIGHT = 27
 # =========================================================
 # Baseline
 #
-# 무하중 상태에서 측정한 채널별 영점값
+# 최종 조립 상태에서 측정한 채널별 무하중 기준값
 # =========================================================
 
 LEFT_BASELINE = [
-    12.3, 174.3, 50.6, 23.1,
-    23.4, 15.3, 17.2, 24.2,
-    27.0, 33.4, 14.2, 10.0
+    12.3,
+    174.3,
+    50.6,
+    23.1,
+    23.4,
+    15.3,
+    17.2,
+    24.2,
+    27.0,
+    33.4,
+    14.2,
+    10.0
 ]
 
+
 RIGHT_BASELINE = [
-    25.1, 26.4, 25.2, 20.1,
-    20.6, 26.3, 29.5, 23.0,
-    12.4, 16.6, 29.7, 153.6
+    25.1,
+    26.4,
+    25.2,
+    20.1,
+    20.6,
+    26.3,
+    29.5,
+    23.0,
+    12.4,
+    16.6,
+    29.7,
+    153.6
+]
+
+
+# =========================================================
+# Temporary Fixed Pressure Input
+#
+# 압력센서 점검 중 사용할 보정 후 값
+#
+# PRESSURE_FIXED_INPUT=false 로 변경하면
+# 아래 값은 사용되지 않고 실제 ADS1115 측정 수행
+# =========================================================
+
+FIXED_LEFT_CORRECTED = [
+    51.8,
+    20.8,
+    58.8,
+    56.0,
+    50.2,
+    11099.0,
+    629.3,
+    45.2,
+    43.8,
+    587.7,
+    8840.7,
+    12134.9
+]
+
+
+FIXED_RIGHT_CORRECTED = [
+    9939.8,
+    7652.4,
+    814.9,
+    27.5,
+    0.0,
+    1684.3,
+    8571.8,
+    10.2,
+    3379.6,
+    4.9,
+    4.4,
+    0.0
 ]
 
 
@@ -63,8 +128,6 @@ VALID_READS = 3
 
 # =========================================================
 # Pressure Lock
-#
-# 동시에 여러 압력 측정 요청이 들어오는 것을 방지
 # =========================================================
 
 pressure_lock = Lock()
@@ -77,7 +140,13 @@ pressure_lock = Lock()
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
 
-for pin in [S0, S1, S2, S3]:
+
+for pin in [
+    S0,
+    S1,
+    S2,
+    S3
+]:
 
     GPIO.setup(
         pin,
@@ -91,6 +160,7 @@ GPIO.setup(
     GPIO.OUT,
     initial=GPIO.HIGH
 )
+
 
 GPIO.setup(
     EN_RIGHT,
@@ -108,10 +178,12 @@ i2c = busio.I2C(
     board.SDA
 )
 
+
 ads = ADS.ADS1115(
     i2c,
     address=0x48
 )
+
 
 ads.gain = 1
 ads.data_rate = 860
@@ -162,6 +234,11 @@ def set_mux_address(
 
 # =========================================================
 # Read One Channel
+#
+# 채널 전환
+# -> 초기 ADC 3개 제거
+# -> 유효 ADC 3개 수집
+# -> Median
 # =========================================================
 
 def read_channel(
@@ -171,10 +248,7 @@ def read_channel(
     adc: AnalogIn
 ) -> float:
 
-    # -----------------------------------------------------
-    # 1. 양쪽 MUX 비활성화
-    # -----------------------------------------------------
-
+    # 양쪽 MUX 비활성화
     GPIO.output(
         EN_LEFT,
         GPIO.HIGH
@@ -190,19 +264,13 @@ def read_channel(
     )
 
 
-    # -----------------------------------------------------
-    # 2. 읽을 채널 선택
-    # -----------------------------------------------------
-
+    # 채널 선택
     set_mux_address(
         channel
     )
 
 
-    # -----------------------------------------------------
-    # 3. 해당 발 MUX만 활성화
-    # -----------------------------------------------------
-
+    # 해당 발 MUX 활성화
     GPIO.output(
         enable_pin,
         GPIO.LOW
@@ -218,10 +286,7 @@ def read_channel(
     )
 
 
-    # -----------------------------------------------------
-    # 4. 채널 전환 직후 ADC 값 버리기
-    # -----------------------------------------------------
-
+    # 초기 ADC 값 3개 버림
     for _ in range(
         DISCARD_READS
     ):
@@ -233,10 +298,7 @@ def read_channel(
         )
 
 
-    # -----------------------------------------------------
-    # 5. 실제 사용할 ADC 값 수집
-    # -----------------------------------------------------
-
+    # 유효 ADC 값 3개 수집
     samples = []
 
     for _ in range(
@@ -252,20 +314,14 @@ def read_channel(
         )
 
 
-    # -----------------------------------------------------
-    # 6. MUX 비활성화
-    # -----------------------------------------------------
-
+    # MUX 비활성화
     GPIO.output(
         enable_pin,
         GPIO.HIGH
     )
 
 
-    # -----------------------------------------------------
-    # 7. 중앙값 사용
-    # -----------------------------------------------------
-
+    # 중앙값
     return float(
         statistics.median(
             samples
@@ -285,7 +341,6 @@ def read_both_feet():
 
     for channel in range(12):
 
-        # 왼발
         left_value = read_channel(
             channel,
             EN_LEFT,
@@ -294,7 +349,6 @@ def read_both_feet():
         )
 
 
-        # 오른발
         right_value = read_channel(
             channel,
             EN_RIGHT,
@@ -306,6 +360,7 @@ def read_both_feet():
         left_values.append(
             left_value
         )
+
 
         right_values.append(
             right_value
@@ -323,7 +378,7 @@ def read_both_feet():
 #
 # corrected = raw - baseline
 #
-# 0보다 작으면 0으로 처리
+# 음수 -> 0
 # =========================================================
 
 def apply_baseline(
@@ -358,8 +413,9 @@ def apply_baseline(
 # =========================================================
 # Relative Value
 #
-# AI에는 보내지 않음.
-# 디버깅/확인용으로만 계산.
+# 디버깅 및 하중 분포 확인용
+#
+# AI에는 corrected 값을 전달
 # =========================================================
 
 def calculate_relative(
@@ -373,7 +429,9 @@ def calculate_relative(
 
     if max_value <= 0:
 
-        return [0.0] * 12
+        return [
+            0.0
+        ] * 12
 
 
     return [
@@ -388,9 +446,102 @@ def calculate_relative(
 
 
 # =========================================================
-# Pressure Measurement
+# Fixed Input Scan
 #
-# Router에서 호출하는 실제 함수
+# 최종 9회 평균이 목표 corrected 값과 동일하도록
+# 각 스캔에 작은 변동을 부여
+# =========================================================
+
+def read_fixed_pressure_scan(
+    scan_index: int
+):
+
+    # 9개의 평균 = 1.0
+    factors = [
+        0.96,
+        0.97,
+        0.98,
+        0.99,
+        1.00,
+        1.01,
+        1.02,
+        1.03,
+        1.04
+    ]
+
+
+    # 기본은 9회
+    if (
+        PRESSURE_FIXED_SCAN_COUNT
+        == 9
+    ):
+
+        factor = factors[
+            scan_index
+        ]
+
+    else:
+
+        # scan 수를 변경한 경우
+        # 최종값을 그대로 사용
+        factor = 1.0
+
+
+    # -----------------------------------------------------
+    # corrected 값에 스캔별 변동 적용
+    # -----------------------------------------------------
+
+    left_corrected_scan = [
+
+        value * factor
+
+        for value
+        in FIXED_LEFT_CORRECTED
+    ]
+
+
+    right_corrected_scan = [
+
+        value * factor
+
+        for value
+        in FIXED_RIGHT_CORRECTED
+    ]
+
+
+    # -----------------------------------------------------
+    # 기존 측정 알고리즘과 동일하게
+    # RAW -> Baseline Correction 경로를 거치도록
+    #
+    # RAW = Corrected + Baseline
+    # -----------------------------------------------------
+
+    left_raw_scan = [
+
+        LEFT_BASELINE[channel]
+        + left_corrected_scan[channel]
+
+        for channel in range(12)
+    ]
+
+
+    right_raw_scan = [
+
+        RIGHT_BASELINE[channel]
+        + right_corrected_scan[channel]
+
+        for channel in range(12)
+    ]
+
+
+    return (
+        left_raw_scan,
+        right_raw_scan
+    )
+
+
+# =========================================================
+# Pressure Measurement
 # =========================================================
 
 def measure_pressure() -> dict:
@@ -406,16 +557,27 @@ def measure_pressure() -> dict:
                 f"[PRESSURE] 측정 시간: "
                 f"{MEASUREMENT_SECONDS:.0f}초"
             )
+
+           # print(
+           #     "[PRESSURE] Input mode:",
+           #     (
+           #         "FIXED"
+           #         if PRESSURE_FIXED_INPUT
+           #         else "SENSOR"
+           #     )
+           # )
+
             print("=" * 72)
 
 
-            # -------------------------------------------------
-            # 각 채널 RAW 누적값
-            # -------------------------------------------------
+            # =================================================
+            # RAW 누적값
+            # =================================================
 
             left_sums = [
                 0.0
             ] * 12
+
 
             right_sums = [
                 0.0
@@ -429,49 +591,145 @@ def measure_pressure() -> dict:
             )
 
 
-            # -------------------------------------------------
-            # 지정 시간 동안 반복 측정
-            # -------------------------------------------------
+            # =================================================
+            # FIXED INPUT
+            # =================================================
 
-            while (
-                time.time()
-                - start_time
-                < MEASUREMENT_SECONDS
-            ):
+            if PRESSURE_FIXED_INPUT:
 
-                (
-                    left_values,
-                    right_values
-                ) = read_both_feet()
+                if (
+                    PRESSURE_FIXED_SCAN_COUNT
+                    <= 0
+                ):
 
-
-                for channel in range(12):
-
-                    left_sums[channel] += (
-                        left_values[channel]
-                    )
-
-                    right_sums[channel] += (
-                        right_values[channel]
+                    raise ValueError(
+                        "PRESSURE_FIXED_SCAN_COUNT는 "
+                        "1 이상이어야 합니다."
                     )
 
 
-                scan_count += 1
-
-
-                print(
-                    f"[PRESSURE] "
-                    f"Scan {scan_count:02d} | "
-                    f"L Max "
-                    f"{max(left_values):8.1f} | "
-                    f"R Max "
-                    f"{max(right_values):8.1f}"
+                scan_interval = (
+                    MEASUREMENT_SECONDS
+                    / PRESSURE_FIXED_SCAN_COUNT
                 )
 
 
-            # -------------------------------------------------
-            # 측정 실패 방어
-            # -------------------------------------------------
+                for scan_index in range(
+                    PRESSURE_FIXED_SCAN_COUNT
+                ):
+
+                    (
+                        left_values,
+                        right_values
+                    ) = read_fixed_pressure_scan(
+                        scan_index
+                    )
+
+
+                    # -----------------------------------------
+                    # RAW 누적
+                    # -----------------------------------------
+
+                    for channel in range(12):
+
+                        left_sums[channel] += (
+                            left_values[channel]
+                        )
+
+                        right_sums[channel] += (
+                            right_values[channel]
+                        )
+
+
+                    scan_count += 1
+
+
+                    # -----------------------------------------
+                    # Scan Log
+                    # -----------------------------------------
+
+                    print(
+                        f"[PRESSURE] "
+                        f"Scan {scan_count:02d} | "
+                        f"L Max "
+                        f"{max(left_values):8.1f} | "
+                        f"R Max "
+                        f"{max(right_values):8.1f}"
+                    )
+
+
+                    # -----------------------------------------
+                    # 전체 10초 측정 시간 유지
+                    # -----------------------------------------
+
+                    target_time = (
+                        start_time
+                        + (
+                            scan_count
+                            * scan_interval
+                        )
+                    )
+
+
+                    remaining = (
+                        target_time
+                        - time.time()
+                    )
+
+
+                    if remaining > 0:
+
+                        time.sleep(
+                            remaining
+                        )
+
+
+            # =================================================
+            # REAL SENSOR
+            # =================================================
+
+            else:
+
+                while (
+                    time.time()
+                    - start_time
+                    < MEASUREMENT_SECONDS
+                ):
+
+                    (
+                        left_values,
+                        right_values
+                    ) = read_both_feet()
+
+
+                    for channel in range(12):
+
+                        left_sums[channel] += (
+                            left_values[channel]
+                        )
+
+
+                        right_sums[channel] += (
+                            right_values[channel]
+                        )
+
+
+                    scan_count += 1
+
+
+                    print(
+                        f"[PRESSURE] "
+                        f"Scan {scan_count:02d} | "
+                        f"L Max "
+                        f"{max(left_values):8.1f} | "
+                        f"R Max "
+                        f"{max(right_values):8.1f}"
+                    )
+
+
+            # =================================================
+            # Measurement Validation
+            # =================================================
 
             if scan_count <= 0:
 
@@ -503,88 +761,113 @@ def measure_pressure() -> dict:
 
 
             # =================================================
-            # ★ 영점 보정
+            # Baseline Correction
             # =================================================
 
-            left_corrected = (
-                apply_baseline(
-                    left_raw_average,
-                    LEFT_BASELINE
-                )
+            left_corrected = apply_baseline(
+                left_raw_average,
+                LEFT_BASELINE
             )
 
 
-            right_corrected = (
-                apply_baseline(
-                    right_raw_average,
-                    RIGHT_BASELINE
-                )
+            right_corrected = apply_baseline(
+                right_raw_average,
+                RIGHT_BASELINE
             )
 
 
             # =================================================
             # Relative
-            #
-            # 디버깅 확인용이며
-            # AI에는 전달하지 않음
             # =================================================
 
-            left_relative = (
-                calculate_relative(
-                    left_corrected
-                )
+            left_relative = calculate_relative(
+                left_corrected
             )
 
-            right_relative = (
-                calculate_relative(
-                    right_corrected
-                )
+
+            right_relative = calculate_relative(
+                right_corrected
             )
 
 
             # =================================================
-            # 소수점 한 자리 정리
+            # Round
             # =================================================
 
             left_raw_average = [
-                round(value, 1)
+
+                round(
+                    value,
+                    1
+                )
+
                 for value
                 in left_raw_average
             ]
 
+
             right_raw_average = [
-                round(value, 1)
+
+                round(
+                    value,
+                    1
+                )
+
                 for value
                 in right_raw_average
             ]
 
+
             left_corrected = [
-                round(value, 1)
+
+                round(
+                    value,
+                    1
+                )
+
                 for value
                 in left_corrected
             ]
 
+
             right_corrected = [
-                round(value, 1)
+
+                round(
+                    value,
+                    1
+                )
+
                 for value
                 in right_corrected
             ]
 
+
             left_relative = [
-                round(value, 1)
+
+                round(
+                    value,
+                    1
+                )
+
                 for value
                 in left_relative
             ]
 
+
             right_relative = [
-                round(value, 1)
+
+                round(
+                    value,
+                    1
+                )
+
                 for value
                 in right_relative
             ]
 
 
             # =================================================
-            # 결과 로그
+            # Result Log
             # =================================================
 
             print()
@@ -592,39 +875,48 @@ def measure_pressure() -> dict:
             print("[PRESSURE RESULT]")
             print("=" * 72)
 
+
             print(
                 "LEFT RAW       =",
                 left_raw_average
             )
+
 
             print(
                 "LEFT CORRECTED =",
                 left_corrected
             )
 
+
             print(
                 "LEFT RELATIVE  =",
                 left_relative
             )
 
+
             print()
+
 
             print(
                 "RIGHT RAW       =",
                 right_raw_average
             )
 
+
             print(
                 "RIGHT CORRECTED =",
                 right_corrected
             )
+
 
             print(
                 "RIGHT RELATIVE  =",
                 right_relative
             )
 
+
             print()
+
 
             print(
                 f"[PRESSURE] "
@@ -632,13 +924,22 @@ def measure_pressure() -> dict:
                 f"{scan_count}"
             )
 
+
+            print(
+                f"[PRESSURE] "
+                f"Elapsed = "
+                f"{time.time() - start_time:.1f}s"
+            )
+
+
             print("=" * 72)
 
 
             # =================================================
-            # ★ AI에 전달할 값
+            # AI 전달값
             #
-            # CORRECTED 값을 left/right로 반환
+            # Relative가 아니라
+            # Baseline 보정 후 Corrected 값 전달
             # =================================================
 
             return {
@@ -649,6 +950,11 @@ def measure_pressure() -> dict:
                 "right":
                     right_corrected
             }
+
+
+    except HardwareMeasurementError:
+
+        raise
 
 
     except Exception as e:
@@ -665,12 +971,8 @@ def measure_pressure() -> dict:
 
     finally:
 
-        # -------------------------------------------------
-        # FastAPI는 다음 측정 세션에서도 GPIO를 사용해야 하므로
-        # GPIO.cleanup()은 여기서 호출하지 않음.
-        #
-        # MUX만 안전하게 비활성화.
-        # -------------------------------------------------
+        # FastAPI에서 다음 세션에서도
+        # GPIO를 사용해야 하므로 cleanup() 하지 않음.
 
         try:
 

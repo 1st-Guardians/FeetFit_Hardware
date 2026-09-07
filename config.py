@@ -601,7 +601,7 @@ BME280_SAMPLE_INTERVAL_SECONDS = float(
 BUZZER_GPIO_PIN = int(
     os.getenv(
         "BUZZER_GPIO_PIN",
-        "16"
+        "12"
     )
 )
 
@@ -609,4 +609,22 @@ BUZZER_GPIO_PIN = int(
 BUZZER_ACTIVE_HIGH = env_bool(
     "BUZZER_ACTIVE_HIGH",
     True
+)
+
+
+# =========================================================
+# Pressure
+# =========================================================
+
+PRESSURE_FIXED_INPUT = env_bool(
+    "PRESSURE_FIXED_INPUT",
+    False
+)
+
+
+PRESSURE_FIXED_SCAN_COUNT = int(
+    os.getenv(
+        "PRESSURE_FIXED_SCAN_COUNT",
+        "9"
+    )
 )

@@ -17,16 +17,18 @@ from hardware.environment import (
     measure_environment
 )
 
+from hardware.buzzer import (
+    buzzer_ready,
+    buzzer_error
+)
+
 from errors import HardwareMeasurementError
 
 from clients.backend_client import (
     send_hardware_failed
 )
 
-from hardware.buzzer import (
-    buzzer_ready,
-    buzzer_error
-)
+
 router = APIRouter()
 
 
@@ -63,10 +65,18 @@ def measurement_start(
 
     try:
 
+        # =================================================
+        # ?? ?? ? ??? ??
+        # =================================================
+
         before = (
             measure_environment()
         )
 
+
+        # =================================================
+        # BEFORE ??? ?? ??
+        # =================================================
 
         update_session(
             session_id,
@@ -77,11 +87,22 @@ def measurement_start(
             beforeHumidity=
                 before["humidity"]
         )
+
+
+        # =================================================
+        # ?? ?? ?? ??
+        #
+        # WAITING_FOR_PHOTO
+        # ? 1?
+        # =================================================
+
         buzzer_ready()
 
 
         return {
-            "accepted": True,
+
+            "accepted":
+                True,
 
             "measurementSessionId":
                 session_id,
@@ -91,7 +112,16 @@ def measurement_start(
         }
 
 
+    # =====================================================
+    # ??? ?? ? ???? ??
+    #
+    # ??? - ???
+    # =====================================================
+
     except HardwareMeasurementError as e:
+
+        buzzer_error()
+
 
         send_hardware_failed(
             session_id,
@@ -99,6 +129,7 @@ def measurement_start(
             e.message,
             e.detail
         )
+
 
         raise HTTPException(
             status_code=500,
