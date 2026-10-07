@@ -1,4 +1,5 @@
 import os
+
 import requests
 
 from errors import AIRequestNotAccepted
@@ -15,6 +16,10 @@ def check_ai_202(
     response: requests.Response,
     name: str
 ):
+    """
+    AI 서버가 요청을
+    정상적으로 비동기 접수했는지 확인합니다.
+    """
 
     print(
         f"[AI {name}] "
@@ -25,31 +30,61 @@ def check_ai_202(
     if response.status_code != 202:
 
         raise AIRequestNotAccepted(
-            status_code=response.status_code,
+            status_code=
+                response.status_code,
+
             detail=(
-                f"{name} AI 요청이"
+                f"{name} AI 요청이 "
                 f"202 Accepted 되지 않았습니다. "
                 f"{response.text}"
             )
         )
 
-    data = response.json()
+    try:
 
-    if data.get("accepted") is not True:
+        data = response.json()
+
+    except Exception as e:
 
         raise AIRequestNotAccepted(
             status_code=202,
             detail=(
-                f"{name} AI accepted=false"
+                f"{name} AI 응답을 "
+                f"JSON으로 해석할 수 없습니다. "
+                f"{e}"
+            )
+        )
+
+    if data.get(
+        "accepted"
+    ) is not True:
+
+        raise AIRequestNotAccepted(
+            status_code=202,
+            detail=(
+                f"{name} AI "
+                f"accepted=false"
             )
         )
 
     return data
 
+
 def send_photo(
     session_id: int,
+    photo_capture_attempt: int,
     photos: dict
 ):
+    """
+    촬영한 사진 3장을 AI 서버로 전달합니다.
+
+    함께 전달되는 값:
+        measurementSessionId
+        photoCaptureAttempt
+        dorsalFootImage
+        leftPlantarFootImage
+        rightPlantarFootImage
+    """
 
     session = get_session(
         session_id
@@ -60,15 +95,28 @@ def send_photo(
         "/api/reports/photo-analysis"
     )
 
+    print(
+        "[AI PHOTO REQUEST]",
+        f"session={session_id}",
+        f"attempt={photo_capture_attempt}",
+        f"url={url}"
+    )
+
     with (
-        open(photos["dorsal"], "rb")
-        as dorsal_file,
+        open(
+            photos["dorsal"],
+            "rb"
+        ) as dorsal_file,
 
-        open(photos["left"], "rb")
-        as left_file,
+        open(
+            photos["left"],
+            "rb"
+        ) as left_file,
 
-        open(photos["right"], "rb")
-        as right_file
+        open(
+            photos["right"],
+            "rb"
+        ) as right_file
     ):
 
         response = requests.post(
@@ -79,7 +127,12 @@ def send_photo(
             },
             data={
                 "measurementSessionId":
-                    str(session_id)
+                    str(session_id),
+
+                "photoCaptureAttempt":
+                    str(
+                        photo_capture_attempt
+                    )
             },
             files={
                 "dorsalFootImage": (
@@ -108,6 +161,7 @@ def send_photo(
         "PHOTO"
     )
 
+
 def send_environment(
     session_id: int,
     before_temperature: float,
@@ -115,6 +169,9 @@ def send_environment(
     after_temperature: float,
     after_humidity: float
 ):
+    """
+    환경 측정 결과를 AI 서버로 전달합니다.
+    """
 
     session = get_session(
         session_id
@@ -157,11 +214,16 @@ def send_environment(
         "ENVIRONMENT"
     )
 
+
 def send_pressure(
     session_id: int,
     left_values: list,
     right_values: list
 ):
+    """
+    좌/우 FSR 측정값을
+    AI 서버로 전달합니다.
+    """
 
     session = get_session(
         session_id
