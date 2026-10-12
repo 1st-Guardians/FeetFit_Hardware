@@ -1,0 +1,5 @@
+﻿phase,block,n_windows,raw_mean_adc,filtered_mean_adc,raw_window_sd_adc,filtered_window_sd_adc,sd_change_pct
+baseline,0,30,32.804,33.189,37.261,38.147,-2.38
+loaded,1,40,31.458,31.4,42.522,43.228,-1.66
+loaded,2,40,31.889,31.875,42.623,43.342,-1.69
+loaded,3,40,31.022,30.883,41.633,42.619,-2.37

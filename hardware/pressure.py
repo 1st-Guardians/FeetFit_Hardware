@@ -9,34 +9,77 @@ from adafruit_ads1x15.ads1115 import ADS1115
 from adafruit_ads1x15.analog_in import AnalogIn
 from adafruit_ads1x15.ads1x15 import Pin
 
+from config import (
+    # Fixed input
+    PRESSURE_FIXED_INPUT,
+    PRESSURE_FIXED_SCAN_COUNT,
+
+    # FSR / MUX GPIO
+    FSR_MUX_S0_GPIO,
+    FSR_MUX_S1_GPIO,
+    FSR_MUX_S2_GPIO,
+    FSR_MUX_S3_GPIO,
+
+    FSR_LEFT_EN_GPIO,
+    FSR_RIGHT_EN_GPIO,
+    FSR_MUX_ENABLE_ACTIVE_LOW,
+
+    # FSR channels
+    FSR_SENSOR_COUNT,
+    FSR_FIRST_CHANNEL,
+    FSR_LAST_CHANNEL,
+
+    # MUX timing
+    FSR_MUX_SETTLE_SECONDS,
+
+    # ADS1115
+    ADS1115_I2C_ADDRESS,
+    ADS1115_LEFT_CHANNEL,
+    ADS1115_RIGHT_CHANNEL,
+    ADS1115_GAIN,
+    ADS1115_DATA_RATE,
+
+    # Measurement
+    FSR_MEASUREMENT_SECONDS,
+    FSR_DISCARD_INITIAL_READS,
+    FSR_DISCARD_INTERVAL_SECONDS,
+    FSR_VALID_READS,
+    FSR_SAMPLE_INTERVAL_SECONDS,
+
+    # FSR circuit
+    FSR_FIXED_RESISTOR_OHMS,
+
+    # FSR BASELINE
+    FSR_LEFT_BASELINE,
+    FSR_RIGHT_BASELINE,
+
+    FSR_NOISE_FLOOR,
+)
+
 from errors import HardwareMeasurementError
 
 
 # =========================================================
-# FeetFit Pressure Sensor
+# GPIO / MUX
 #
-# ★ 사용자 기준 실제 배선 ★
+# 모든 값은
 #
-# 사용자 LEFT
-#   MUX EN -> GPIO17
-#   SIG    -> ADS1115 A0
+# .env
+#   ↓
+# config.py
+#   ↓
+# pressure.py
 #
-# 사용자 RIGHT
-#   MUX EN -> GPIO27
-#   SIG    -> ADS1115 A1
-#
-# CD74HC4067
-#   EN LOW  = 활성화
-#   EN HIGH = 비활성화
+# 순서로 읽음
 # =========================================================
 
-EN_LEFT = 17
-EN_RIGHT = 27
+S0 = FSR_MUX_S0_GPIO
+S1 = FSR_MUX_S1_GPIO
+S2 = FSR_MUX_S2_GPIO
+S3 = FSR_MUX_S3_GPIO
 
-S0 = 22
-S1 = 23
-S2 = 24
-S3 = 25
+EN_LEFT = FSR_LEFT_EN_GPIO
+EN_RIGHT = FSR_RIGHT_EN_GPIO
 
 SELECT_PINS = [
     S0,
@@ -45,83 +88,177 @@ SELECT_PINS = [
     S3,
 ]
 
-CHANNEL_COUNT = 12
+
+# =========================================================
+# MUX Enable Logic
+#
+# CD74HC4067 기본:
+#
+# LOW  = Enable
+# HIGH = Disable
+#
+# .env
+#
+# FSR_MUX_ENABLE_ACTIVE_LOW=true
+# =========================================================
+
+if FSR_MUX_ENABLE_ACTIVE_LOW:
+    MUX_ENABLE_LEVEL = GPIO.LOW
+    MUX_DISABLE_LEVEL = GPIO.HIGH
+else:
+    MUX_ENABLE_LEVEL = GPIO.HIGH
+    MUX_DISABLE_LEVEL = GPIO.LOW
 
 
 # =========================================================
-# Baseline
-#
-# IMPORTANT
-#
-# 기존 baseline은 잘못된 MUX/ADC 조합에서 측정했기 때문에
-# 사용하지 않음.
-#
-# RAW 정상 확인 후 무하중 상태에서 다시 측정하여
-# 아래 값을 교체해야 함.
+# Channel Configuration
 # =========================================================
 
-LEFT_BASELINE = [
-    26.6,
-    185.8,
-    138.6,
-    27.0,
-    29.3,
-    28.4,
-    30.9,
-    29.1,
-    27.9,
-    28.7,
-    25.8,
-    30.5,
+CHANNEL_COUNT = FSR_SENSOR_COUNT
+
+FIRST_CHANNEL = FSR_FIRST_CHANNEL
+LAST_CHANNEL = FSR_LAST_CHANNEL
+
+CHANNELS = list(
+    range(
+        FIRST_CHANNEL,
+        LAST_CHANNEL + 1,
+    )
+)
+
+
+if len(CHANNELS) != CHANNEL_COUNT:
+    raise ValueError(
+        "FSR 채널 설정이 올바르지 않습니다. "
+        f"FSR_SENSOR_COUNT={CHANNEL_COUNT}, "
+        f"FSR_FIRST_CHANNEL={FIRST_CHANNEL}, "
+        f"FSR_LAST_CHANNEL={LAST_CHANNEL}"
+    )
+
+LEFT_BASELINE = FSR_LEFT_BASELINE
+RIGHT_BASELINE = FSR_RIGHT_BASELINE
+
+if len(LEFT_BASELINE) != CHANNEL_COUNT:
+    raise ValueError(
+        "LEFT_BASELINE 길이와 "
+        "FSR_SENSOR_COUNT가 다릅니다."
+    )
+
+
+if len(RIGHT_BASELINE) != CHANNEL_COUNT:
+    raise ValueError(
+        "RIGHT_BASELINE 길이와 "
+        "FSR_SENSOR_COUNT가 다릅니다."
+    )
+
+
+# =========================================================
+# Fixed Pressure Input
+#
+# 테스트용
+#
+# PRESSURE_FIXED_INPUT=false이면
+# 실제 센서를 사용하므로 아래 값은 사용하지 않음
+# =========================================================
+
+FIXED_LEFT_CORRECTED = [
+    51.8,
+    20.8,
+    58.8,
+    56.0,
+    50.2,
+    11099.0,
+    629.3,
+    45.2,
+    43.8,
+    587.7,
+    8840.7,
+    12134.9,
 ]
 
-RIGHT_BASELINE = [
-    26.2,
-    25.6,
-    26.9,
-    26.9,
-    23.6,
-    25.9,
-    34.6,
-    28.0,
-    28.8,
-    31.4,
-    28.5,
-    26.5,
+FIXED_RIGHT_CORRECTED = [
+    9939.8,
+    7652.4,
+    814.9,
+    27.5,
+    0.0,
+    1684.3,
+    8571.8,
+    10.2,
+    3379.6,
+    4.9,
+    4.4,
+    0.0,
 ]
 
 
 # =========================================================
 # Measurement Configuration
 #
-# pt.py 방식
-#
-# 채널 변경
-# ↓
-# 안정화
-# ↓
-# ADC 초기값 3개 버림
-# ↓
-# 실제 값 10회 측정
-# ↓
-# 평균
+# 전부 config.py에서 가져옴
 # =========================================================
 
-MEASUREMENT_SECONDS = 10.0
+MEASUREMENT_SECONDS = (
+    FSR_MEASUREMENT_SECONDS
+)
 
-MUX_SETTLE_TIME = 0.010
+MUX_SETTLE_TIME = (
+    FSR_MUX_SETTLE_SECONDS
+)
 
-DISCARD_READS = 3
-DISCARD_INTERVAL = 0.005
+DISCARD_READS = (
+    FSR_DISCARD_INITIAL_READS
+)
 
-VALID_READS = 10
-SAMPLE_INTERVAL = 0.010
+DISCARD_INTERVAL = (
+    FSR_DISCARD_INTERVAL_SECONDS
+)
 
-NOISE_THRESHOLD = 15.0
+VALID_READS = (
+    FSR_VALID_READS
+)
+
+SAMPLE_INTERVAL = (
+    FSR_SAMPLE_INTERVAL_SECONDS
+)
+
+
 # =========================================================
-# Lock
+# Validation
+# =========================================================
+
+if MEASUREMENT_SECONDS <= 0:
+    raise ValueError(
+        "FSR_MEASUREMENT_SECONDS는 "
+        "0보다 커야 합니다."
+    )
+
+
+if DISCARD_READS < 0:
+    raise ValueError(
+        "FSR_DISCARD_INITIAL_READS는 "
+        "0 이상이어야 합니다."
+    )
+
+
+if VALID_READS <= 0:
+    raise ValueError(
+        "FSR_VALID_READS는 "
+        "1 이상이어야 합니다."
+    )
+
+
+if MUX_SETTLE_TIME < 0:
+    raise ValueError(
+        "FSR_MUX_SETTLE_SECONDS는 "
+        "0 이상이어야 합니다."
+    )
+
+
+# =========================================================
+# Pressure Lock
 #
-# API에서 압력 측정이 동시에 실행되는 것 방지
+# 동시에 두 번 압력 측정이 실행되지 않도록 함
 # =========================================================
 
 pressure_lock = Lock()
@@ -140,43 +277,70 @@ for pin in SELECT_PINS:
     GPIO.setup(
         pin,
         GPIO.OUT,
-    )
-
-    GPIO.output(
-        pin,
-        GPIO.LOW,
+        initial=GPIO.LOW,
     )
 
 
 GPIO.setup(
     EN_LEFT,
     GPIO.OUT,
+    initial=MUX_DISABLE_LEVEL,
 )
+
 
 GPIO.setup(
     EN_RIGHT,
     GPIO.OUT,
-)
-
-
-# 처음에는 양쪽 MUX 모두 OFF
-GPIO.output(
-    EN_LEFT,
-    GPIO.HIGH,
-)
-
-GPIO.output(
-    EN_RIGHT,
-    GPIO.HIGH,
+    initial=MUX_DISABLE_LEVEL,
 )
 
 
 # =========================================================
 # ADS1115 Setup
 #
-# 사용자 LEFT  -> A0
-# 사용자 RIGHT -> A1
+# .env 예:
+#
+# ADS1115_I2C_ADDRESS=0x48
+# ADS1115_LEFT_CHANNEL=0
+# ADS1115_RIGHT_CHANNEL=1
+#
+# 실제 테스트 결과:
+#
+# LEFT  -> A0
+# RIGHT -> A1
 # =========================================================
+
+ADS_PIN_MAP = {
+    0: Pin.A0,
+    1: Pin.A1,
+    2: Pin.A2,
+    3: Pin.A3,
+}
+
+
+if ADS1115_LEFT_CHANNEL not in ADS_PIN_MAP:
+    raise ValueError(
+        "ADS1115_LEFT_CHANNEL은 "
+        "0~3 사이여야 합니다."
+    )
+
+
+if ADS1115_RIGHT_CHANNEL not in ADS_PIN_MAP:
+    raise ValueError(
+        "ADS1115_RIGHT_CHANNEL은 "
+        "0~3 사이여야 합니다."
+    )
+
+
+if (
+    ADS1115_LEFT_CHANNEL
+    == ADS1115_RIGHT_CHANNEL
+):
+    raise ValueError(
+        "LEFT와 RIGHT ADS1115 채널이 "
+        "같게 설정되어 있습니다."
+    )
+
 
 i2c = busio.I2C(
     board.SCL,
@@ -186,47 +350,59 @@ i2c = busio.I2C(
 
 ads = ADS1115(
     i2c,
-    address=0x48,
+    address=ADS1115_I2C_ADDRESS,
 )
+
+
+ads.gain = ADS1115_GAIN
+ads.data_rate = ADS1115_DATA_RATE
 
 
 left_adc = AnalogIn(
     ads,
-    Pin.A0,
+    ADS_PIN_MAP[
+        ADS1115_LEFT_CHANNEL
+    ],
 )
 
 
 right_adc = AnalogIn(
     ads,
-    Pin.A1,
+    ADS_PIN_MAP[
+        ADS1115_RIGHT_CHANNEL
+    ],
 )
 
 
 # =========================================================
-# Disable Both MUXes
+# MUX Disable
 # =========================================================
 
 def disable_muxes():
 
     GPIO.output(
         EN_LEFT,
-        GPIO.HIGH,
+        MUX_DISABLE_LEVEL,
     )
 
     GPIO.output(
         EN_RIGHT,
-        GPIO.HIGH,
+        MUX_DISABLE_LEVEL,
     )
 
 
 # =========================================================
-# Select MUX Channel
+# MUX Channel Select
 #
-# CD74HC4067
-#
-# C0 ~ C15
+# CD74HC4067:
 #
 # S0 = LSB
+#
+# C0  = 0000
+# C1  = 0001
+# C2  = 0010
+# ...
+# C11 = 1011
 # =========================================================
 
 def select_channel(
@@ -236,7 +412,8 @@ def select_channel(
     if channel < 0 or channel > 15:
 
         raise ValueError(
-            "channel은 0~15 사이여야 합니다."
+            "MUX channel은 "
+            "0~15 사이여야 합니다."
         )
 
 
@@ -250,18 +427,14 @@ def select_channel(
         )
 
 
-    # 채널 전환 후 안정화
-    time.sleep(
-        MUX_SETTLE_TIME
-    )
-
-
 # =========================================================
-# Read ADC
+# ADC Read
 #
-# 채널 변경 직후 값 3회 버림
+# 채널 선택
 # ↓
-# 10회 읽기
+# 초기 ADC 값 버림
+# ↓
+# VALID_READS만큼 실제 측정
 # ↓
 # 평균값 반환
 # =========================================================
@@ -270,9 +443,9 @@ def read_adc(
     adc: AnalogIn,
 ) -> float:
 
-    # -----------------------------------------
+    # -----------------------------------------------------
     # 초기값 버리기
-    # -----------------------------------------
+    # -----------------------------------------------------
 
     for _ in range(
         DISCARD_READS
@@ -280,14 +453,16 @@ def read_adc(
 
         _ = adc.value
 
-        time.sleep(
-            DISCARD_INTERVAL
-        )
+        if DISCARD_INTERVAL > 0:
+
+            time.sleep(
+                DISCARD_INTERVAL
+            )
 
 
-    # -----------------------------------------
-    # 실제 측정값
-    # -----------------------------------------
+    # -----------------------------------------------------
+    # 실제 측정
+    # -----------------------------------------------------
 
     values = []
 
@@ -300,14 +475,23 @@ def read_adc(
             adc.value
         )
 
-        time.sleep(
-            SAMPLE_INTERVAL
+        if SAMPLE_INTERVAL > 0:
+
+            time.sleep(
+                SAMPLE_INTERVAL
+            )
+
+
+    if not values:
+
+        raise ValueError(
+            "ADC 측정값이 없습니다."
         )
 
 
-    # -----------------------------------------
+    # -----------------------------------------------------
     # 평균
-    # -----------------------------------------
+    # -----------------------------------------------------
 
     return float(
         sum(values)
@@ -318,138 +502,123 @@ def read_adc(
 # =========================================================
 # Read One Foot
 #
-# pt.py 방식
-#
-# 해당 발 MUX를 한 번 켠 뒤
-# C0 ~ C11 전체 측정
-#
-# 전체 측정이 끝난 뒤 MUX OFF
+# 한쪽 MUX만 활성화한 상태에서
+# C0 ~ C11 순차 측정
 # =========================================================
 
 def read_foot(
-    adc: AnalogIn,
     enable_pin: int,
     other_enable_pin: int,
+    adc: AnalogIn,
 ) -> list:
 
     values = []
 
 
-    # -----------------------------------------
-    # 두 MUX 모두 OFF
-    # -----------------------------------------
+    for channel in CHANNELS:
 
-    disable_muxes()
+        # -------------------------------------------------
+        # 1. 두 MUX 모두 OFF
+        # -------------------------------------------------
 
-
-    # -----------------------------------------
-    # 반대쪽 MUX는 OFF 상태 유지
-    # -----------------------------------------
-
-    GPIO.output(
-        other_enable_pin,
-        GPIO.HIGH,
-    )
+        disable_muxes()
 
 
-    # -----------------------------------------
-    # 측정할 MUX ON
-    #
-    # CD74HC4067 EN = Active LOW
-    # -----------------------------------------
+        # -------------------------------------------------
+        # 2. 읽을 MUX 채널 선택
+        # -------------------------------------------------
 
-    GPIO.output(
-        enable_pin,
-        GPIO.LOW,
-    )
+        select_channel(
+            channel
+        )
 
 
-    # MUX 활성화 안정화
-    time.sleep(
-        0.020
-    )
+        # -------------------------------------------------
+        # 3. 반대쪽 MUX OFF
+        # -------------------------------------------------
+
+        GPIO.output(
+            other_enable_pin,
+            MUX_DISABLE_LEVEL,
+        )
 
 
-    try:
+        # -------------------------------------------------
+        # 4. 측정할 MUX ON
+        # -------------------------------------------------
 
-        # -------------------------------------
-        # MUX를 켠 상태로
-        # C0 ~ C11 연속 측정
-        # -------------------------------------
+        GPIO.output(
+            enable_pin,
+            MUX_ENABLE_LEVEL,
+        )
 
-        for channel in range(
-            CHANNEL_COUNT
-        ):
 
-            select_channel(
-                channel
+        # -------------------------------------------------
+        # 5. MUX 안정화
+        # -------------------------------------------------
+
+        if MUX_SETTLE_TIME > 0:
+
+            time.sleep(
+                MUX_SETTLE_TIME
             )
 
+
+        try:
 
             value = read_adc(
                 adc
             )
 
 
-            values.append(
-                value
+        finally:
+
+            # 측정 후 해당 MUX OFF
+
+            GPIO.output(
+                enable_pin,
+                MUX_DISABLE_LEVEL,
             )
 
 
-        return values
-
-
-    finally:
-
-        # -------------------------------------
-        # 한 발 전체 측정 완료 후 MUX OFF
-        # -------------------------------------
-
-        GPIO.output(
-            enable_pin,
-            GPIO.HIGH,
+        values.append(
+            value
         )
+
+
+    return values
 
 
 # =========================================================
 # Read Both Feet
 #
-# ★ 사용자 기준 ★
+# 실제 현재 배선은 .env 기준
 #
 # LEFT
-# GPIO17 + ADS1115 A0
+#   EN  -> GPIO17
+#   SIG -> ADS1115 A0
 #
 # RIGHT
-# GPIO27 + ADS1115 A1
+#   EN  -> GPIO27
+#   SIG -> ADS1115 A1
+#
+# 단, 실제 값은 하드코딩하지 않고
+# config.py에서 가져옴
 # =========================================================
 
 def read_both_feet():
 
-    # -----------------------------------------
-    # 사용자 LEFT
-    #
-    # GPIO17
-    # ADS1115 A0
-    # -----------------------------------------
-
     left_values = read_foot(
-        adc=left_adc,
         enable_pin=EN_LEFT,
         other_enable_pin=EN_RIGHT,
+        adc=left_adc,
     )
 
 
-    # -----------------------------------------
-    # 사용자 RIGHT
-    #
-    # GPIO27
-    # ADS1115 A1
-    # -----------------------------------------
-
     right_values = read_foot(
-        adc=right_adc,
         enable_pin=EN_RIGHT,
         other_enable_pin=EN_LEFT,
+        adc=right_adc,
     )
 
 
@@ -464,12 +633,7 @@ def read_both_feet():
 #
 # corrected = raw - baseline
 #
-# 음수는 0
-#
-# 현재는 baseline이 0이므로
-# RAW 정상 여부 확인용.
-#
-# baseline 재측정 후 실제 보정값이 적용됨.
+# 음수는 0으로 처리
 # =========================================================
 
 def apply_baseline(
@@ -477,31 +641,64 @@ def apply_baseline(
     baseline: list,
 ) -> list:
 
+    if len(raw_values) != CHANNEL_COUNT:
+        raise ValueError(
+            "RAW ??? ??? "
+            "FSR_SENSOR_COUNT? ????."
+        )
+
+    if len(baseline) != CHANNEL_COUNT:
+        raise ValueError(
+            "Baseline ??? "
+            "FSR_SENSOR_COUNT? ????."
+        )
+
     corrected = []
 
-    for channel in range(CHANNEL_COUNT):
+    for index in range(
+        CHANNEL_COUNT
+    ):
 
-        value = raw_values[channel] - baseline[channel]
+        value = (
+            raw_values[index]
+            - baseline[index]
+        )
 
-        if value <= NOISE_THRESHOLD:
+        # ?? ??
+        if value < 0:
             value = 0.0
 
-        corrected.append(value)
+        # ??? ADC ??? ??
+        if value < FSR_NOISE_FLOOR:
+            value = 0.0
+
+        corrected.append(
+            value
+        )
 
     return corrected
+
 
 
 # =========================================================
 # Relative Pressure
 #
-# 한 발에서 가장 높은 센서를 100으로 환산
+# 각 발에서 가장 높은 값을 100으로 환산
 #
-# 히트맵 / 디버깅용
+# 디버깅 / 앱 확인용
+#
+# AI에는 Relative가 아니라
+# baseline 보정된 corrected 값을 전달
 # =========================================================
 
 def calculate_relative(
     corrected_values: list,
 ) -> list:
+
+    if not corrected_values:
+
+        return []
+
 
     max_value = max(
         corrected_values
@@ -527,18 +724,197 @@ def calculate_relative(
 
 
 # =========================================================
+# Fixed Input
+#
+# 기존 테스트 모드 지원
+# =========================================================
+
+def _read_fixed_pressure():
+
+    if PRESSURE_FIXED_SCAN_COUNT <= 0:
+
+        raise ValueError(
+            "PRESSURE_FIXED_SCAN_COUNT는 "
+            "1 이상이어야 합니다."
+        )
+
+
+    # 기존 9회 테스트 모드에서
+    # 전체 평균이 1.0이 되도록 구성
+    default_factors = [
+        0.96,
+        0.97,
+        0.98,
+        0.99,
+        1.00,
+        1.01,
+        1.02,
+        1.03,
+        1.04,
+    ]
+
+
+    left_sums = [
+        0.0
+    ] * CHANNEL_COUNT
+
+
+    right_sums = [
+        0.0
+    ] * CHANNEL_COUNT
+
+
+    scan_count = 0
+
+    start_time = time.monotonic()
+
+    scan_interval = (
+        MEASUREMENT_SECONDS
+        / PRESSURE_FIXED_SCAN_COUNT
+    )
+
+
+    for scan_index in range(
+        PRESSURE_FIXED_SCAN_COUNT
+    ):
+
+        if (
+            PRESSURE_FIXED_SCAN_COUNT
+            == len(default_factors)
+        ):
+
+            factor = (
+                default_factors[
+                    scan_index
+                ]
+            )
+
+        else:
+
+            factor = 1.0
+
+
+        left_corrected_scan = [
+
+            value * factor
+
+            for value
+            in FIXED_LEFT_CORRECTED
+        ]
+
+
+        right_corrected_scan = [
+
+            value * factor
+
+            for value
+            in FIXED_RIGHT_CORRECTED
+        ]
+
+
+        # 기존 실제 센서 처리와 동일하게
+        # RAW -> baseline correction 경로를 거치기 위해
+        # baseline을 다시 더함
+
+        left_raw_scan = [
+
+            LEFT_BASELINE[index]
+            + left_corrected_scan[index]
+
+            for index in range(
+                CHANNEL_COUNT
+            )
+        ]
+
+
+        right_raw_scan = [
+
+            RIGHT_BASELINE[index]
+            + right_corrected_scan[index]
+
+            for index in range(
+                CHANNEL_COUNT
+            )
+        ]
+
+
+        for index in range(
+            CHANNEL_COUNT
+        ):
+
+            left_sums[index] += (
+                left_raw_scan[index]
+            )
+
+            right_sums[index] += (
+                right_raw_scan[index]
+            )
+
+
+        scan_count += 1
+
+
+        print(
+            f"[PRESSURE] "
+            f"Scan {scan_count:02d} | "
+            f"L Max {max(left_raw_scan):8.1f} | "
+            f"R Max {max(right_raw_scan):8.1f}"
+        )
+
+
+        target_time = (
+            start_time
+            + scan_count
+            * scan_interval
+        )
+
+
+        remaining = (
+            target_time
+            - time.monotonic()
+        )
+
+
+        if remaining > 0:
+
+            time.sleep(
+                remaining
+            )
+
+
+    return (
+        left_sums,
+        right_sums,
+        scan_count,
+    )
+
+
+# =========================================================
 # Pressure Measurement
 #
-# 10초 동안 반복 측정
+# 실제 센서 모드:
 #
-# Scan:
-#
-# LEFT C0 ~ C11
+# 10초 반복 측정
 # ↓
-# RIGHT C0 ~ C11
+# 좌우 C0~C11 Scan
+# ↓
+# RAW 평균
+# ↓
+# Baseline 제거
+# ↓
+# Relative 계산
+# ↓
+# corrected 값 반환
 #
-# 각 Scan 결과를 누적한 뒤
-# 채널별 평균 계산
+#
+# 반환 형식:
+#
+# {
+#     "left":  [...],
+#     "right": [...]
+# }
+#
+# AI에는 corrected 값을 전달
 # =========================================================
 
 def measure_pressure() -> dict:
@@ -548,13 +924,12 @@ def measure_pressure() -> dict:
         with pressure_lock:
 
             print()
-
             print(
                 "=" * 72
             )
 
             print(
-                "[PRESSURE] 실제 센서 측정 시작"
+                "[PRESSURE] 측정 시작"
             )
 
             print(
@@ -563,16 +938,44 @@ def measure_pressure() -> dict:
             )
 
             print(
-                "[PRESSURE] USER LEFT  = GPIO17 / ADS1115 A0"
+                "[PRESSURE] Input Mode = "
+                + (
+                    "FIXED"
+                    if PRESSURE_FIXED_INPUT
+                    else "SENSOR"
+                )
             )
 
-            print(
-                "[PRESSURE] USER RIGHT = GPIO27 / ADS1115 A1"
-            )
 
-            print(
-                "[PRESSURE] MUX 방식 = 한 발 C0~C11 연속 측정"
-            )
+            if not PRESSURE_FIXED_INPUT:
+
+                print(
+                    f"[PRESSURE] USER LEFT  = "
+                    f"GPIO{EN_LEFT} / "
+                    f"ADS1115 A{ADS1115_LEFT_CHANNEL}"
+                )
+
+                print(
+                    f"[PRESSURE] USER RIGHT = "
+                    f"GPIO{EN_RIGHT} / "
+                    f"ADS1115 A{ADS1115_RIGHT_CHANNEL}"
+                )
+
+                print(
+                    f"[PRESSURE] ADS1115 = "
+                    f"{hex(ADS1115_I2C_ADDRESS)}"
+                )
+
+                print(
+                    f"[PRESSURE] ADS Gain = "
+                    f"{ADS1115_GAIN}"
+                )
+
+                print(
+                    f"[PRESSURE] ADS Data Rate = "
+                    f"{ADS1115_DATA_RATE}"
+                )
+
 
             print(
                 "=" * 72
@@ -580,75 +983,104 @@ def measure_pressure() -> dict:
 
 
             # =================================================
-            # RAW 누적
+            # FIXED MODE
             # =================================================
 
-            left_sums = [
-                0.0
-            ] * CHANNEL_COUNT
-
-
-            right_sums = [
-                0.0
-            ] * CHANNEL_COUNT
-
-
-            scan_count = 0
-
-
-            start_time = (
-                time.monotonic()
-            )
-
-
-            # =================================================
-            # 실제 측정
-            # =================================================
-
-            while (
-                time.monotonic()
-                - start_time
-                < MEASUREMENT_SECONDS
-            ):
+            if PRESSURE_FIXED_INPUT:
 
                 (
-                    left_values,
-                    right_values,
-                ) = read_both_feet()
+                    left_sums,
+                    right_sums,
+                    scan_count,
+                ) = _read_fixed_pressure()
 
 
-                # -----------------------------------------
-                # 이번 Scan RAW 누적
-                # -----------------------------------------
+            # =================================================
+            # REAL SENSOR MODE
+            # =================================================
 
-                for channel in range(
-                    CHANNEL_COUNT
+            else:
+
+                left_sums = [
+                    0.0
+                ] * CHANNEL_COUNT
+
+
+                right_sums = [
+                    0.0
+                ] * CHANNEL_COUNT
+
+
+                scan_count = 0
+
+
+                start_time = (
+                    time.monotonic()
+                )
+
+
+                while (
+                    time.monotonic()
+                    - start_time
+                    < MEASUREMENT_SECONDS
                 ):
 
-                    left_sums[channel] += (
-                        left_values[channel]
+                    (
+                        left_values,
+                        right_values,
+                    ) = read_both_feet()
+
+
+                    if (
+                        len(left_values)
+                        != CHANNEL_COUNT
+                    ):
+
+                        raise ValueError(
+                            "LEFT 측정 채널 수가 "
+                            "올바르지 않습니다."
+                        )
+
+
+                    if (
+                        len(right_values)
+                        != CHANNEL_COUNT
+                    ):
+
+                        raise ValueError(
+                            "RIGHT 측정 채널 수가 "
+                            "올바르지 않습니다."
+                        )
+
+
+                    # -----------------------------------------
+                    # RAW 누적
+                    # -----------------------------------------
+
+                    for index in range(
+                        CHANNEL_COUNT
+                    ):
+
+                        left_sums[index] += (
+                            left_values[index]
+                        )
+
+                        right_sums[index] += (
+                            right_values[index]
+                        )
+
+
+                    scan_count += 1
+
+
+                    print(
+                        f"[PRESSURE] "
+                        f"Scan {scan_count:02d} | "
+                        f"L Max "
+                        f"{max(left_values):8.1f} | "
+                        f"R Max "
+                        f"{max(right_values):8.1f}"
                     )
-
-                    right_sums[channel] += (
-                        right_values[channel]
-                    )
-
-
-                scan_count += 1
-
-
-                # -----------------------------------------
-                # Scan Log
-                # -----------------------------------------
-
-                print(
-                    f"[PRESSURE] "
-                    f"Scan {scan_count:02d} | "
-                    f"L Max "
-                    f"{max(left_values):8.1f} | "
-                    f"R Max "
-                    f"{max(right_values):8.1f}"
-                )
 
 
             # =================================================
@@ -799,11 +1231,10 @@ def measure_pressure() -> dict:
 
 
             # =================================================
-            # Result
+            # Result Log
             # =================================================
 
             print()
-
             print(
                 "=" * 72
             )
@@ -822,12 +1253,10 @@ def measure_pressure() -> dict:
                 left_raw_average,
             )
 
-
             print(
                 "LEFT CORRECTED =",
                 left_corrected,
             )
-
 
             print(
                 "LEFT RELATIVE =",
@@ -843,12 +1272,10 @@ def measure_pressure() -> dict:
                 right_raw_average,
             )
 
-
             print(
                 "RIGHT CORRECTED =",
                 right_corrected,
             )
-
 
             print(
                 "RIGHT RELATIVE =",
@@ -867,37 +1294,20 @@ def measure_pressure() -> dict:
 
 
             print(
-                f"[PRESSURE] "
-                f"Elapsed = "
-                f"{time.monotonic() - start_time:.1f}s"
-            )
-
-
-            print(
                 "=" * 72
             )
 
 
             # =================================================
-            # API / AI 전달
+            # AI 전달값
             #
-            # 기존 인터페이스 유지
-            #
-            # {
-            #     "left":  [C0 ... C11],
-            #     "right": [C0 ... C11]
-            # }
-            #
-            # 사용자 기준 LEFT / RIGHT
+            # Relative가 아니라
+            # Baseline 보정된 실제 ADC 값을 반환
             # =================================================
 
             return {
-
-                "left":
-                    left_corrected,
-
-                "right":
-                    right_corrected,
+                "left": left_corrected,
+                "right": right_corrected,
             }
 
 
@@ -909,24 +1319,21 @@ def measure_pressure() -> dict:
     except Exception as e:
 
         raise HardwareMeasurementError(
-
-            reason=
-                "PRESSURE_SENSOR_ERROR",
-
+            reason="PRESSURE_SENSOR_ERROR",
             message=(
                 "압력 측정에 실패했습니다. "
                 "다시 시도해주세요."
             ),
-
-            detail=
-                str(e),
+            detail=str(e),
         )
 
 
     finally:
 
-        # FastAPI 서버에서 다음 측정에도
-        # GPIO를 사용해야 하므로 GPIO.cleanup() 하지 않음.
+        # FastAPI 서버가 다음 측정에서도 GPIO를
+        # 계속 사용해야 하므로 GPIO.cleanup()은 하지 않음.
+        #
+        # 측정 종료 후 MUX만 안전하게 비활성화.
 
         try:
 

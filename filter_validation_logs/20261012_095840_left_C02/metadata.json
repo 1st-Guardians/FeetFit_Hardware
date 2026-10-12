@@ -1,0 +1,54 @@
+{
+  "foot": "left",
+  "channel": 2,
+  "baseline_adc": 32.089,
+  "loaded_adc": 26.961,
+  "response_difference_adc": -5.128,
+  "filter": {
+    "discard": 3,
+    "reads": 9,
+    "method": "median of each 3 samples then average"
+  },
+  "summary": [
+    {
+      "phase": "baseline",
+      "block": 0,
+      "n_windows": 30,
+      "raw_mean_adc": 31.663,
+      "filtered_mean_adc": 32.089,
+      "raw_window_sd_adc": 47.243,
+      "filtered_window_sd_adc": 48.622,
+      "sd_change_pct": -2.92
+    },
+    {
+      "phase": "loaded",
+      "block": 1,
+      "n_windows": 40,
+      "raw_mean_adc": 26.917,
+      "filtered_mean_adc": 26.808,
+      "raw_window_sd_adc": 40.662,
+      "filtered_window_sd_adc": 41.667,
+      "sd_change_pct": -2.47
+    },
+    {
+      "phase": "loaded",
+      "block": 2,
+      "n_windows": 40,
+      "raw_mean_adc": 27.925,
+      "filtered_mean_adc": 27.65,
+      "raw_window_sd_adc": 42.385,
+      "filtered_window_sd_adc": 43.585,
+      "sd_change_pct": -2.83
+    },
+    {
+      "phase": "loaded",
+      "block": 3,
+      "n_windows": 40,
+      "raw_mean_adc": 26.43,
+      "filtered_mean_adc": 26.425,
+      "raw_window_sd_adc": 24.34,
+      "filtered_window_sd_adc": 24.677,
+      "sd_change_pct": -1.39
+    }
+  ]
+}

@@ -1,0 +1,229 @@
+{
+  "wiring": {
+    "left": "GPIO17 ADS A1",
+    "right": "GPIO27 ADS A0"
+  },
+  "filter": "discard 3, read 9, median each 3, average medians",
+  "unit": "ADC raw counts",
+  "filter_example_sensor": "L07",
+  "left": [
+    {
+      "sensor": "L00",
+      "side": "left",
+      "channel": 0,
+      "baseline_adc": 35.233,
+      "loaded_adc": 29.467,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "L01",
+      "side": "left",
+      "channel": 1,
+      "baseline_adc": 15.0,
+      "loaded_adc": 28.2,
+      "corrected_adc": 13.2,
+      "relative_0_100": 86.46
+    },
+    {
+      "sensor": "L02",
+      "side": "left",
+      "channel": 2,
+      "baseline_adc": 50.467,
+      "loaded_adc": 38.333,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "L03",
+      "side": "left",
+      "channel": 3,
+      "baseline_adc": 18.5,
+      "loaded_adc": 23.767,
+      "corrected_adc": 5.267,
+      "relative_0_100": 34.5
+    },
+    {
+      "sensor": "L04",
+      "side": "left",
+      "channel": 4,
+      "baseline_adc": 35.6,
+      "loaded_adc": 34.6,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "L05",
+      "side": "left",
+      "channel": 5,
+      "baseline_adc": 32.067,
+      "loaded_adc": 31.633,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "L06",
+      "side": "left",
+      "channel": 6,
+      "baseline_adc": 36.433,
+      "loaded_adc": 32.167,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "L07",
+      "side": "left",
+      "channel": 7,
+      "baseline_adc": 11.567,
+      "loaded_adc": 26.833,
+      "corrected_adc": 15.267,
+      "relative_0_100": 100.0
+    },
+    {
+      "sensor": "L08",
+      "side": "left",
+      "channel": 8,
+      "baseline_adc": 51.433,
+      "loaded_adc": 39.333,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "L09",
+      "side": "left",
+      "channel": 9,
+      "baseline_adc": 14.533,
+      "loaded_adc": 23.5,
+      "corrected_adc": 8.967,
+      "relative_0_100": 58.73
+    },
+    {
+      "sensor": "L10",
+      "side": "left",
+      "channel": 10,
+      "baseline_adc": 41.7,
+      "loaded_adc": 36.967,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "L11",
+      "side": "left",
+      "channel": 11,
+      "baseline_adc": 21.3,
+      "loaded_adc": 27.433,
+      "corrected_adc": 6.133,
+      "relative_0_100": 40.17
+    }
+  ],
+  "right": [
+    {
+      "sensor": "R00",
+      "side": "right",
+      "channel": 0,
+      "baseline_adc": 47.167,
+      "loaded_adc": 51.8,
+      "corrected_adc": 4.633,
+      "relative_0_100": 30.35
+    },
+    {
+      "sensor": "R01",
+      "side": "right",
+      "channel": 1,
+      "baseline_adc": 24.433,
+      "loaded_adc": 31.8,
+      "corrected_adc": 7.367,
+      "relative_0_100": 48.25
+    },
+    {
+      "sensor": "R02",
+      "side": "right",
+      "channel": 2,
+      "baseline_adc": 41.767,
+      "loaded_adc": 33.167,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "R03",
+      "side": "right",
+      "channel": 3,
+      "baseline_adc": 29.533,
+      "loaded_adc": 27.267,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "R04",
+      "side": "right",
+      "channel": 4,
+      "baseline_adc": 40.1,
+      "loaded_adc": 28.3,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "R05",
+      "side": "right",
+      "channel": 5,
+      "baseline_adc": 34.067,
+      "loaded_adc": 28.733,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "R06",
+      "side": "right",
+      "channel": 6,
+      "baseline_adc": 31.967,
+      "loaded_adc": 29.133,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "R07",
+      "side": "right",
+      "channel": 7,
+      "baseline_adc": 36.333,
+      "loaded_adc": 24.9,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "R08",
+      "side": "right",
+      "channel": 8,
+      "baseline_adc": 43.633,
+      "loaded_adc": 30.667,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "R09",
+      "side": "right",
+      "channel": 9,
+      "baseline_adc": 27.567,
+      "loaded_adc": 25.633,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "R10",
+      "side": "right",
+      "channel": 10,
+      "baseline_adc": 35.867,
+      "loaded_adc": 27.567,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    },
+    {
+      "sensor": "R11",
+      "side": "right",
+      "channel": 11,
+      "baseline_adc": 32.6,
+      "loaded_adc": 25.033,
+      "corrected_adc": 0.0,
+      "relative_0_100": 0.0
+    }
+  ]
+}

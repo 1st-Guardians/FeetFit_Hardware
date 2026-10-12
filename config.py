@@ -616,6 +616,14 @@ BUZZER_ACTIVE_HIGH = env_bool(
 # Pressure
 # =========================================================
 
+# =========================================================
+# Pressure
+# =========================================================
+
+# ---------------------------------------------------------
+# Fixed / Test Mode
+# ---------------------------------------------------------
+
 PRESSURE_FIXED_INPUT = env_bool(
     "PRESSURE_FIXED_INPUT",
     False
@@ -626,5 +634,261 @@ PRESSURE_FIXED_SCAN_COUNT = int(
     os.getenv(
         "PRESSURE_FIXED_SCAN_COUNT",
         "9"
+    )
+)
+
+
+# =========================================================
+# FSR / CD74HC4067 MUX
+# =========================================================
+
+FSR_MUX_S0_GPIO = int(
+    os.getenv(
+        "FSR_MUX_S0_GPIO",
+        "22"
+    )
+)
+
+FSR_MUX_S1_GPIO = int(
+    os.getenv(
+        "FSR_MUX_S1_GPIO",
+        "23"
+    )
+)
+
+FSR_MUX_S2_GPIO = int(
+    os.getenv(
+        "FSR_MUX_S2_GPIO",
+        "24"
+    )
+)
+
+FSR_MUX_S3_GPIO = int(
+    os.getenv(
+        "FSR_MUX_S3_GPIO",
+        "25"
+    )
+)
+
+
+# =========================================================
+# FSR MUX Enable
+#
+# ?? ?? ??
+#
+# LEFT  -> GPIO17
+# RIGHT -> GPIO27
+#
+# CD74HC4067 EN = Active LOW
+# =========================================================
+
+FSR_LEFT_EN_GPIO = int(
+    os.getenv(
+        "FSR_LEFT_EN_GPIO",
+        "17"
+    )
+)
+
+FSR_RIGHT_EN_GPIO = int(
+    os.getenv(
+        "FSR_RIGHT_EN_GPIO",
+        "27"
+    )
+)
+
+FSR_MUX_ENABLE_ACTIVE_LOW = env_bool(
+    "FSR_MUX_ENABLE_ACTIVE_LOW",
+    True
+)
+
+
+# =========================================================
+# FSR Channel
+#
+# ? ? C0 ~ C11
+# =========================================================
+
+FSR_SENSOR_COUNT = int(
+    os.getenv(
+        "FSR_SENSOR_COUNT",
+        "12"
+    )
+)
+
+FSR_FIRST_CHANNEL = int(
+    os.getenv(
+        "FSR_FIRST_CHANNEL",
+        "0"
+    )
+)
+
+FSR_LAST_CHANNEL = int(
+    os.getenv(
+        "FSR_LAST_CHANNEL",
+        "11"
+    )
+)
+
+
+# =========================================================
+# MUX Timing
+# =========================================================
+
+FSR_MUX_SETTLE_SECONDS = float(
+    os.getenv(
+        "FSR_MUX_SETTLE_SECONDS",
+        "0.010"
+    )
+)
+
+
+# =========================================================
+# ADS1115
+#
+# ?? ?? ?? ???? ??
+#
+# LEFT  MUX -> ADS1115 A0
+# RIGHT MUX -> ADS1115 A1
+# =========================================================
+
+ADS1115_I2C_ADDRESS = int(
+    os.getenv(
+        "ADS1115_I2C_ADDRESS",
+        "0x48"
+    ),
+    0
+)
+
+ADS1115_LEFT_CHANNEL = int(
+    os.getenv(
+        "ADS1115_LEFT_CHANNEL",
+        "0"
+    )
+)
+
+ADS1115_RIGHT_CHANNEL = int(
+    os.getenv(
+        "ADS1115_RIGHT_CHANNEL",
+        "1"
+    )
+)
+
+ADS1115_GAIN = int(
+    os.getenv(
+        "ADS1115_GAIN",
+        "1"
+    )
+)
+
+ADS1115_DATA_RATE = int(
+    os.getenv(
+        "ADS1115_DATA_RATE",
+        "860"
+    )
+)
+
+
+# =========================================================
+# Pressure Measurement
+# =========================================================
+
+FSR_MEASUREMENT_SECONDS = float(
+    os.getenv(
+        "FSR_MEASUREMENT_SECONDS",
+        "10"
+    )
+)
+
+
+# MUX ?? ? ?? ADC ? ???
+FSR_DISCARD_INITIAL_READS = int(
+    os.getenv(
+        "FSR_DISCARD_INITIAL_READS",
+        "3"
+    )
+)
+
+FSR_DISCARD_INTERVAL_SECONDS = float(
+    os.getenv(
+        "FSR_DISCARD_INTERVAL_SECONDS",
+        "0.005"
+    )
+)
+
+
+# ?? ADC ??? ?
+FSR_VALID_READS = int(
+    os.getenv(
+        "FSR_VALID_READS",
+        "10"
+    )
+)
+
+FSR_SAMPLE_INTERVAL_SECONDS = float(
+    os.getenv(
+        "FSR_SAMPLE_INTERVAL_SECONDS",
+        "0.010"
+    )
+)
+
+
+# =========================================================
+# FSR Voltage Divider
+# =========================================================
+
+FSR_FIXED_RESISTOR_OHMS = int(
+    os.getenv(
+        "FSR_FIXED_RESISTOR_OHMS",
+        "47000"
+    )
+)
+
+# =========================================================
+# FSR Baseline
+# =========================================================
+
+FSR_LEFT_BASELINE = [
+    float(value.strip())
+    for value in os.getenv(
+        "FSR_LEFT_BASELINE",
+        (
+            "17.7,200.8,41.7,16.1,"
+            "31.9,20.9,16.4,22.8,"
+            "15.4,27.8,23.1,30.2"
+        )
+    ).split(",")
+]
+
+
+FSR_RIGHT_BASELINE = [
+    float(value.strip())
+    for value in os.getenv(
+        "FSR_RIGHT_BASELINE",
+        (
+            "25.3,28.2,30.6,29.2,"
+            "21.6,16.0,25.0,26.8,"
+            "25.0,17.2,16.1,17.7"
+        )
+    ).split(",")
+]
+
+
+if len(FSR_LEFT_BASELINE) != FSR_SENSOR_COUNT:
+    raise ValueError(
+        "FSR_LEFT_BASELINE ??? "
+        "FSR_SENSOR_COUNT? ????."
+    )
+
+
+if len(FSR_RIGHT_BASELINE) != FSR_SENSOR_COUNT:
+    raise ValueError(
+        "FSR_RIGHT_BASELINE ??? "
+        "FSR_SENSOR_COUNT? ????."
+    )
+
+FSR_NOISE_FLOOR = float(
+    os.getenv(
+        "FSR_NOISE_FLOOR",
+        "50"
     )
 )
