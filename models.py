@@ -1,9 +1,6 @@
 from typing import Literal
 
-from pydantic import (
-    BaseModel,
-    Field
-)
+from pydantic import BaseModel, Field
 
 
 class MeasurementRequest(BaseModel):
@@ -13,16 +10,21 @@ class MeasurementRequest(BaseModel):
 class PhotoCaptureRequest(BaseModel):
     measurementSessionId: int
 
-    # 최초 촬영: 0
-    # 재촬영: 1 ~ 3
-    #
-    # 백엔드에서 최초 촬영 시
-    # photoCaptureAttempt를 보내지 않아도
-    # 자동으로 0으로 처리
+    # 기존 사진 최초 촬영 요청과의 호환성 유지
     photoCaptureAttempt: int = Field(
         default=0,
         ge=0,
-        le=3
+        le=3,
+    )
+
+
+class PressureStartRequest(BaseModel):
+    measurementSessionId: int
+
+    # 백엔드가 보낸 압력 회차를 그대로 사용
+    # 누락 시 HTTP 422 반환
+    pressureMeasurementAttempt: int = Field(
+        ge=0,
     )
 
 
